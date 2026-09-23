@@ -1,0 +1,189 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Jackdaw — image converter — corvidae.tools" description="Convert images between JPEG, PNG and WebP entirely in your browser. Nothing is uploaded.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+    <h1 style="font-size: 32px; margin: 0;">Jackdaw</h1>
+    <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Coloeus monedula</span>
+  </div>
+  <p class="tagline" style="margin-top: 8px;">Convert images between JPEG, PNG and WebP. Everything happens on your device &mdash; the file never leaves your browser.</p>
+
+  <div id="safari-warning" style="display: none; background: #2a1f14; border: 1px solid #6b4a1f; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; color: #e0b374; font-family: var(--font-mono);">
+    Your browser doesn't support encoding to WebP &mdash; you can still convert <em>from</em> WebP, but converting <em>to</em> WebP will fall back to PNG. Chrome and Firefox support WebP output fully.
+  </div>
+
+  <div id="dropzone" style="border: 2px dashed var(--border); border-radius: 16px; padding: 48px 32px; text-align: center; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; margin-bottom: 32px;">
+    <p style="margin: 0 0 8px; font-size: 16px; color: var(--text-muted);">Drop an image here, or click to choose one</p>
+    <p style="margin: 0; font-size: 13px; color: var(--text-faint); font-family: var(--font-mono);">JPEG, PNG or WebP &middot; converted images are cropped to nothing, kept to nothing &mdash; they just live in this tab</p>
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" style="display: none;" />
+  </div>
+
+  <div id="controls" style="display: none; flex-direction: column; gap: 24px;">
+    <div style="display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-end;">
+      <div>
+        <label for="format-select" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Convert to</label>
+        <select id="format-select" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; min-width: 160px;">
+          <option value="image/webp">WebP</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/png">PNG</option>
+        </select>
+      </div>
+      <div id="quality-row" style="flex-grow: 1; min-width: 200px;">
+        <label for="quality-range" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">
+          Quality: <span id="quality-value">85</span>%
+        </label>
+        <input type="range" id="quality-range" min="1" max="100" value="85" style="width: 100%;" />
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
+      <div id="preview-wrap" style="border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-card); width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <img id="preview-img" style="max-width: 100%; max-height: 100%; display: block;" />
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-family: var(--font-mono); font-size: 14px;">
+        <div id="original-info" style="color: var(--text-muted);"></div>
+        <div id="result-info" style="color: var(--accent); display: none;"></div>
+        <a id="download-link" href="#" download style="display: none; margin-top: 8px; background: var(--accent); color: #0d0d0f; padding: 10px 18px; border-radius: 8px; font-weight: 700; text-decoration: none; width: fit-content;">Download</a>
+      </div>
+    </div>
+  </div>
+
+  <Footer />
+</Layout>
+
+<script>
+  const dropzone = document.getElementById('dropzone') as HTMLDivElement;
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const controls = document.getElementById('controls') as HTMLDivElement;
+  const formatSelect = document.getElementById('format-select') as HTMLSelectElement;
+  const qualityRow = document.getElementById('quality-row') as HTMLDivElement;
+  const qualityRange = document.getElementById('quality-range') as HTMLInputElement;
+  const qualityValue = document.getElementById('quality-value') as HTMLSpanElement;
+  const previewImg = document.getElementById('preview-img') as HTMLImageElement;
+  const originalInfo = document.getElementById('original-info') as HTMLDivElement;
+  const resultInfo = document.getElementById('result-info') as HTMLDivElement;
+  const downloadLink = document.getElementById('download-link') as HTMLAnchorElement;
+  const safariWarning = document.getElementById('safari-warning') as HTMLDivElement;
+
+  let currentFile: File | null = null;
+  let currentImage: HTMLImageElement | null = null;
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  function extFor(mime: string): string {
+    if (mime === 'image/webp') return 'webp';
+    if (mime === 'image/jpeg') return 'jpg';
+    return 'png';
+  }
+
+  // feature-detect real WebP *encoding* support — Safari can read WebP but
+  // silently falls back to PNG when asked to write it, so we check up front
+  // rather than let that happen invisibly.
+  async function supportsWebpEncode(): Promise<boolean> {
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = 1;
+    return new Promise((resolve) => {
+      c.toBlob((blob) => resolve(!!blob && blob.type === 'image/webp'), 'image/webp');
+    });
+  }
+
+  supportsWebpEncode().then((supported) => {
+    if (!supported) {
+      safariWarning.style.display = 'block';
+    }
+  });
+
+  function updateQualityVisibility() {
+    const fmt = formatSelect.value;
+    qualityRow.style.display = fmt === 'image/png' ? 'none' : 'block';
+  }
+  formatSelect.addEventListener('change', () => {
+    updateQualityVisibility();
+    if (currentImage) runConversion();
+  });
+  updateQualityVisibility();
+
+  qualityRange.addEventListener('input', () => {
+    qualityValue.textContent = qualityRange.value;
+    if (currentImage) runConversion();
+  });
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--accent)';
+  });
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.style.borderColor = 'var(--border)';
+  });
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--border)';
+    const file = e.dataTransfer?.files[0];
+    if (file) loadFile(file);
+  });
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) loadFile(file);
+  });
+
+  function loadFile(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    currentFile = file;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      currentImage = img;
+      previewImg.src = url;
+      originalInfo.textContent = `Original: ${file.type.replace('image/', '').toUpperCase()} · ${formatBytes(file.size)} · ${img.width}×${img.height}`;
+      controls.style.display = 'flex';
+      resultInfo.style.display = 'none';
+      downloadLink.style.display = 'none';
+      runConversion();
+    };
+    img.src = url;
+  }
+
+  function runConversion() {
+    if (!currentImage || !currentFile) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = currentImage.naturalWidth;
+    canvas.height = currentImage.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(currentImage, 0, 0);
+
+    const targetType = formatSelect.value;
+    const quality = Number(qualityRange.value) / 100;
+    const useQuality = targetType !== 'image/png';
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        // Safari silently returns PNG when WebP encoding isn't supported —
+        // reflect the real output type rather than what was requested
+        const actualType = blob.type || targetType;
+        const savings = currentFile ? Math.round((1 - blob.size / currentFile.size) * 100) : 0;
+        const savingsText = savings > 0 ? ` (${savings}% smaller)` : savings < 0 ? ` (${Math.abs(savings)}% larger)` : '';
+        resultInfo.textContent = `Result: ${actualType.replace('image/', '').toUpperCase()} · ${formatBytes(blob.size)}${savingsText}`;
+        resultInfo.style.display = 'block';
+
+        const url = URL.createObjectURL(blob);
+        downloadLink.href = url;
+        downloadLink.download = `converted.${extFor(actualType)}`;
+        downloadLink.style.display = 'inline-block';
+      },
+      targetType,
+      useQuality ? quality : undefined
+    );
+  }
+</script>
