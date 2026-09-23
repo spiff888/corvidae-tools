@@ -16,25 +16,25 @@ export const tools = [
     description: 'Merge, split and reorder PDF pages, no upload required.',
     status: 'planned'
   },
-  {
-    slug: 'chough',
-    name: 'Chough',
-    latin: 'Pyrrhocorax pyrrhocorax',
-    description: 'QR code generator, with logo overlay and export sizes.',
-    status: 'planned'
-  },
-  {
-    slug: 'magpie',
-    name: 'Magpie',
-    latin: 'Pica pica',
-    description: 'A hand-picked list of tools and links worth bookmarking.',
-    status: 'planned'
-  },
-  {
-    slug: 'rook',
-    name: 'Rook',
-    latin: 'Corvus frugilegus',
-    description: 'Small games and puzzles — a subnet trainer, a port-number quiz.',
-    status: 'planned'
-  }
+  // {
+  //  slug: 'chough',
+  //  name: 'Chough',
+  //  latin: 'Pyrrhocorax pyrrhocorax',
+  //  description: 'QR code generator, with logo overlay and export sizes.',
+  //  status: 'planned'
+  // },
+  // {
+  //  slug: 'magpie',
+  //  name: 'Magpie',
+  //  latin: 'Pica pica',
+  //  description: 'A hand-picked list of tools and links worth bookmarking.',
+  //  status: 'planned'
+  // },
+  // {
+  //  slug: 'rook',
+  //  name: 'Rook',
+  //  latin: 'Corvus frugilegus',
+  //  description: 'Small games and puzzles — a subnet trainer, a port-number quiz.',
+  //  status: 'planned'
+  // }
 ];
