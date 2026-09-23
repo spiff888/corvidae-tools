@@ -6,11 +6,16 @@ import Footer from '../../components/Footer.astro';
 <Layout title="Jackdaw — image converter — corvidae.tools" description="Convert images between JPEG, PNG and WebP entirely in your browser. Nothing is uploaded.">
   <a href="/" class="back-link">&larr; corvidae.tools</a>
 
-  <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
-    <h1 style="font-size: 32px; margin: 0;">Jackdaw</h1>
-    <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Coloeus monedula</span>
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Jackdaw</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Coloeus monedula</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Convert images between JPEG, PNG and WebP. Everything happens on your device &mdash; the file never leaves your browser.</p>
+    </div>
+    <img src="/jackdaw-mark.png" alt="" width="220" style="width: 220px; height: auto; flex-shrink: 0;" />
   </div>
-  <p class="tagline" style="margin-top: 8px;">Convert images between JPEG, PNG and WebP. Everything happens on your device &mdash; the file never leaves your browser.</p>
 
   <div id="safari-warning" style="display: none; background: #2a1f14; border: 1px solid #6b4a1f; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; color: #e0b374; font-family: var(--font-mono);">
     Your browser doesn't support encoding to WebP &mdash; you can still convert <em>from</em> WebP, but converting <em>to</em> WebP will fall back to PNG. Chrome and Firefox support WebP output fully.
