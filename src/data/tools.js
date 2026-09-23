@@ -14,7 +14,7 @@ export const tools = [
     name: 'Nutcracker',
     latin: 'Nucifraga columbiana',
     description: 'Merge, trim and reorder PDF pages, no upload required.',
-    status: 'beta'
+    status: 'beta',
     href: '/tools/nutcracker'
   },
   // {
