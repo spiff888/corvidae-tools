@@ -1,0 +1,227 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Nutcracker — PDF merge, split &amp; reorder — corvidae.tools" description="Merge, split and reorder PDF pages entirely in your browser. Nothing is uploaded.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Nutcracker</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Nucifraga columbiana</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Drop in one or more PDFs, reorder or remove pages, and download the result. Everything happens on your device.</p>
+    </div>
+    <img src="/nutcracker-mark.png" alt="" width="220" style="width: 220px; height: auto; flex-shrink: 0;" />
+  </div>
+
+  <div id="dropzone" style="border: 2px dashed var(--border); border-radius: 16px; padding: 48px 32px; text-align: center; cursor: pointer; transition: border-color 0.15s ease; margin-bottom: 32px;">
+    <p style="margin: 0 0 8px; font-size: 16px; color: var(--text-muted);">Drop one or more PDFs here, or click to choose</p>
+    <p style="margin: 0; font-size: 13px; color: var(--text-faint); font-family: var(--font-mono);">Nothing is uploaded &mdash; files are read and merged in this tab</p>
+    <input type="file" id="file-input" accept="application/pdf" multiple style="display: none;" />
+  </div>
+
+  <div id="empty-state" style="font-family: var(--font-mono); font-size: 14px; color: var(--text-faint); margin-bottom: 32px;">No PDFs loaded yet.</div>
+
+  <div id="page-list-wrap" style="display: none; flex-direction: column; gap: 24px; margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <span id="page-count" style="font-family: var(--font-mono); font-size: 14px; color: var(--text-dim);"></span>
+      <div style="display: flex; gap: 12px;">
+        <button id="clear-btn" style="background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 8px 16px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; cursor: pointer;">Clear all</button>
+        <button id="download-btn" style="background: var(--accent); border: none; color: #0d0d0f; padding: 8px 20px; border-radius: 8px; font-family: var(--font-mono); font-weight: 700; font-size: 13px; cursor: pointer;">Download PDF</button>
+      </div>
+    </div>
+
+    <p style="margin: 0; font-size: 13px; color: var(--text-faint); font-family: var(--font-mono);">Drag a row to reorder. Click &times; to drop a page &mdash; that's your "split."</p>
+
+    <ul id="page-list" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;"></ul>
+  </div>
+
+  <div id="status-msg" style="display: none; font-family: var(--font-mono); font-size: 14px; margin-bottom: 32px;"></div>
+
+  <Footer />
+</Layout>
+
+<script>
+  import { PDFDocument } from 'pdf-lib';
+
+  interface SourceFile {
+    id: number;
+    name: string;
+    bytes: ArrayBuffer;
+    doc: any;
+  }
+
+  interface PageRef {
+    key: string;
+    sourceId: number;
+    sourceName: string;
+    pageIndex: number; // 0-based index within the source doc
+    pageNumber: number; // 1-based, for display
+  }
+
+  const dropzone = document.getElementById('dropzone') as HTMLDivElement;
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const emptyState = document.getElementById('empty-state') as HTMLDivElement;
+  const pageListWrap = document.getElementById('page-list-wrap') as HTMLDivElement;
+  const pageListEl = document.getElementById('page-list') as HTMLUListElement;
+  const pageCountEl = document.getElementById('page-count') as HTMLSpanElement;
+  const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement;
+  const downloadBtn = document.getElementById('download-btn') as HTMLButtonElement;
+  const statusMsg = document.getElementById('status-msg') as HTMLDivElement;
+
+  let sources: SourceFile[] = [];
+  let pages: PageRef[] = [];
+  let nextSourceId = 1;
+  let dragFromIndex: number | null = null;
+
+  function showStatus(text: string, isError = false) {
+    statusMsg.textContent = text;
+    statusMsg.style.display = 'block';
+    statusMsg.style.color = isError ? '#e0847a' : 'var(--text-dim)';
+  }
+
+  function updateEmptyState() {
+    const hasPages = pages.length > 0;
+    emptyState.style.display = hasPages ? 'none' : 'block';
+    pageListWrap.style.display = hasPages ? 'flex' : 'none';
+  }
+
+  function renderList() {
+    pageCountEl.textContent = `${pages.length} page${pages.length === 1 ? '' : 's'} from ${sources.length} file${sources.length === 1 ? '' : 's'}`;
+    pageListEl.innerHTML = '';
+
+    pages.forEach((p, index) => {
+      const li = document.createElement('li');
+      li.draggable = true;
+      li.dataset.index = String(index);
+      li.style.cssText = 'display: flex; align-items: center; gap: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; cursor: grab; font-family: var(--font-mono); font-size: 14px;';
+
+      const handle = document.createElement('span');
+      handle.textContent = '⠿';
+      handle.style.cssText = 'color: var(--text-faint); flex-shrink: 0;';
+
+      const label = document.createElement('span');
+      label.textContent = `${p.sourceName} — page ${p.pageNumber}`;
+      label.style.cssText = 'flex-grow: 1; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = '×';
+      removeBtn.setAttribute('aria-label', 'Remove page');
+      removeBtn.style.cssText = 'background: transparent; border: none; color: var(--text-faint); font-size: 20px; line-height: 1; cursor: pointer; flex-shrink: 0; padding: 0 4px;';
+      removeBtn.addEventListener('click', () => {
+        pages.splice(index, 1);
+        renderList();
+        updateEmptyState();
+      });
+
+      li.append(handle, label, removeBtn);
+
+      li.addEventListener('dragstart', () => {
+        dragFromIndex = index;
+        li.style.opacity = '0.5';
+      });
+      li.addEventListener('dragend', () => {
+        li.style.opacity = '1';
+      });
+      li.addEventListener('dragover', (e) => e.preventDefault());
+      li.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (dragFromIndex === null || dragFromIndex === index) return;
+        const [moved] = pages.splice(dragFromIndex, 1);
+        pages.splice(index, 0, moved);
+        dragFromIndex = null;
+        renderList();
+      });
+
+      pageListEl.appendChild(li);
+    });
+  }
+
+  async function addFiles(fileList: FileList) {
+    for (const file of Array.from(fileList)) {
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) continue;
+      try {
+        const bytes = await file.arrayBuffer();
+        const doc = await PDFDocument.load(bytes);
+        const id = nextSourceId++;
+        sources.push({ id, name: file.name, bytes, doc });
+        const count = doc.getPageCount();
+        for (let i = 0; i < count; i++) {
+          pages.push({
+            key: `${id}-${i}`,
+            sourceId: id,
+            sourceName: file.name,
+            pageIndex: i,
+            pageNumber: i + 1
+          });
+        }
+      } catch (err) {
+        showStatus(`Couldn't read ${file.name} — it may be encrypted or corrupted.`, true);
+      }
+    }
+    renderList();
+    updateEmptyState();
+  }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--accent)';
+  });
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.style.borderColor = 'var(--border)';
+  });
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--border)';
+    if (e.dataTransfer?.files.length) addFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files?.length) addFiles(fileInput.files);
+    fileInput.value = '';
+  });
+
+  clearBtn.addEventListener('click', () => {
+    sources = [];
+    pages = [];
+    statusMsg.style.display = 'none';
+    renderList();
+    updateEmptyState();
+  });
+
+  downloadBtn.addEventListener('click', async () => {
+    if (!pages.length) return;
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Building…';
+    try {
+      const merged = await PDFDocument.create();
+      // group consecutive pages by source to minimize copyPages calls
+      for (const p of pages) {
+        const source = sources.find((s) => s.id === p.sourceId);
+        if (!source) continue;
+        const [copied] = await merged.copyPages(source.doc, [p.pageIndex]);
+        merged.addPage(copied);
+      }
+      const outBytes = await merged.save();
+      const blob = new Blob([outBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pages.length === 1 ? 'page.pdf' : 'merged.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+      showStatus(`Downloaded a ${pages.length}-page PDF.`);
+    } catch (err) {
+      showStatus('Something went wrong building the PDF. Check the console for details.', true);
+      console.error(err);
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = 'Download PDF';
+    }
+  });
+
+  updateEmptyState();
+</script>
