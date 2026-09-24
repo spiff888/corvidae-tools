@@ -17,13 +17,13 @@ export const tools = [
     status: 'beta',
     href: '/tools/nutcracker'
   },
-  // {
-  //  slug: 'chough',
-  //  name: 'Chough',
-  //  latin: 'Pyrrhocorax pyrrhocorax',
-  //  description: 'QR code generator, with logo overlay and export sizes.',
-  //  status: 'planned'
-  // },
+  {
+    slug: 'chough',
+    name: 'Chough',
+    latin: 'Pyrrhocorax pyrrhocorax',
+    description: 'QR code generator, with logo overlay and export sizes.',
+    status: 'planned'
+  },
   // {
   //  slug: 'magpie',
   //  name: 'Magpie',
@@ -31,11 +31,11 @@ export const tools = [
   //  description: 'A hand-picked list of tools and links worth bookmarking.',
   //  status: 'planned'
   // },
-  // {
-  //  slug: 'rook',
-  //  name: 'Rook',
-  //  latin: 'Corvus frugilegus',
-  //  description: 'Small games and puzzles — a subnet trainer, a port-number quiz.',
-  //  status: 'planned'
-  // }
+  {
+    slug: 'rook',
+    name: 'Rook',
+    latin: 'Corvus frugilegus',
+    description: 'Subnet Calculator',
+    status: 'planned'
+  }
 ];
