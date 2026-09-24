@@ -6,13 +6,16 @@ import Footer from '../../components/Footer.astro';
 <Layout title="Rook — IPv4 subnet calculator — corvidae.tools" description="Calculate network address, broadcast address, and usable host range from an IPv4 address and CIDR prefix, entirely in your browser.">
   <a href="/" class="back-link">&larr; corvidae.tools</a>
 
-  <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
-    <h1 style="font-size: 32px; margin: 0;">Rook</h1>
-    <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Corvus frugilegus</span>
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Rook</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Corvus frugilegus</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Enter an IPv4 address and a CIDR prefix to get the network address, broadcast address, and usable host range.</p>
+    </div>
+    <img src="/rook-mark.png" alt="" class="mascot" />
   </div>
-  <p class="tagline" style="margin-top: 8px;">Enter an IPv4 address and a CIDR prefix to get the network address, broadcast address, and usable host range.</p>
-  
-  <img src="/rook-mark.png" alt="" width="220" style="width: 220px; height: auto; flex-shrink: 0;" />
 
   <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-end; margin: 32px 0;">
     <div>
