@@ -61,9 +61,11 @@ a:hover {
   gap: 18px;
 }
 
-.brand img {
-  width: 96px;
-  height: auto;
+.mascot {
+  height: 190px;
+  width: auto;
+  max-width: 100%;
+  flex-shrink: 0;
 }
 
 .wordmark {
@@ -143,6 +145,10 @@ a:hover {
   .brand img {
     width: 64px;
   }
+}
+
+.mascot {
+  height: 110px;
 }
 
 .card {
