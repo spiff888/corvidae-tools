@@ -1,0 +1,54 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="About — corvidae.tools" description="What corvidae.tools is, why it exists, and why every tool is named after a bird.">
+  <Header />
+
+  <h1 style="font-size: 32px; margin: 0 0 24px;">About</h1>
+
+  <div style="max-width: 680px; display: flex; flex-direction: column; gap: 32px;">
+    <p style="font-size: 16px; line-height: 1.7; color: var(--text-muted); margin: 0;">
+      corvidae.tools is a small, growing collection of browser-based tools. Convert an image, merge some PDFs, calculate a subnet, that kind of thing, the stuff you'd normally reach for a random website to do.
+    </p>
+    <p style="font-size: 16px; line-height: 1.7; color: var(--text-muted); margin: 0;">
+      The pitch is simple: nothing you drop in here ever gets uploaded anywhere. Every tool runs entirely in your browser tab. It does its thing, and it's gone when you close the tab.
+    </p>
+
+    <div>
+      <h2 style="font-size: 22px; margin: 0 0 12px;">Why</h2>
+      <p style="font-size: 16px; line-height: 1.7; color: var(--text-muted); margin: 0;">
+        A lot of the sites that do this kind of thing are, frankly, a little sketchy, ad-choked converter sites that feel one wrong click away from a malware download. This is meant to be the alternative: something you can actually trust, because there's nothing to trust, your files never leave your machine.
+      </p>
+    </div>
+
+    <div>
+      <h2 style="font-size: 22px; margin: 0 0 12px;">Why every tool is named after a bird</h2>
+      <p style="font-size: 16px; line-height: 1.7; color: var(--text-muted); margin: 0 0 16px;">
+        Corvidae is the taxonomic family that covers crows, ravens, magpies, jays, jackdaws, nutcrackers, choughs, and rooks. A few reasons that theme fit:
+      </p>
+      <ul style="font-size: 16px; line-height: 1.8; color: var(--text-muted); margin: 0; padding-left: 20px;">
+        <li>Corvids are genuinely tool-users, New Caledonian crows make and use tools in the wild.</li>
+        <li>They're known for problem-solving and intelligence generally.</li>
+        <li>It's a whole family, not one species, so there's a long runway of names before running out.</li>
+        <li>Corvids collect things, a nice echo of a site that collects small useful tools.</li>
+      </ul>
+      <p style="font-size: 16px; line-height: 1.7; color: var(--text-muted); margin: 16px 0 0;">
+        More on how this got built <a href="https://holyit.blog/i-built-corvidae-tools/" target="_blank" rel="noopener">on the blog</a>.
+      </p>
+    </div>
+
+    <div>
+      <h2 style="font-size: 22px; margin: 0 0 12px;">Who built this</h2>
+      <p style="font-size: 16px; line-height: 1.7; color: var(--text-muted); margin: 0;">
+        corvidae.tools is a side project by <a href="https://philipgaw.com" target="_blank" rel="noopener">Philip Gaw</a>. The code is open source, on <a href="https://github.com/spiff888/corvidae-tools" target="_blank" rel="noopener">GitHub</a>.
+      </p>
+    </div>
+  </div>
+
+  <div style="margin-top: 48px;">
+    <Footer />
+  </div>
+</Layout>
