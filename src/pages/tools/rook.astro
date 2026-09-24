@@ -1,0 +1,158 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Rook — IPv4 subnet calculator — corvidae.tools" description="Calculate network address, broadcast address, and usable host range from an IPv4 address and CIDR prefix, entirely in your browser.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+    <h1 style="font-size: 32px; margin: 0;">Rook</h1>
+    <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Corvus frugilegus</span>
+  </div>
+  <p class="tagline" style="margin-top: 8px;">Enter an IPv4 address and a CIDR prefix to get the network address, broadcast address, and usable host range.</p>
+
+  <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-end; margin: 32px 0;">
+    <div>
+      <label for="ip-input" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">IP address</label>
+      <input type="text" id="ip-input" value="192.168.1.10" spellcheck="false" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; width: 220px;" />
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-family: var(--font-mono); font-size: 20px; color: var(--text-faint); padding-bottom: 10px;">/</span>
+      <div>
+        <label for="cidr-input" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">CIDR prefix</label>
+        <input type="number" id="cidr-input" value="24" min="0" max="32" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; width: 90px;" />
+      </div>
+    </div>
+  </div>
+
+  <div id="error-msg" style="display: none; background: #2a1414; border: 1px solid #6b1f1f; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; color: #e08a8a; font-family: var(--font-mono);"></div>
+
+  <div id="results" style="display: none;">
+    <div class="card" style="max-width: 560px; padding: 0; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 14px;">
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <Footer />
+</Layout>
+
+<style>
+  #results-body tr {
+    border-bottom: 1px solid var(--border);
+  }
+  #results-body tr:last-child {
+    border-bottom: none;
+  }
+  #results-body td {
+    padding: 14px 20px;
+  }
+  #results-body td:first-child {
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  #results-body td:last-child {
+    color: var(--text);
+    text-align: right;
+    font-weight: 700;
+  }
+</style>
+
+<script>
+  const ipInput = document.getElementById('ip-input') as HTMLInputElement;
+  const cidrInput = document.getElementById('cidr-input') as HTMLInputElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLDivElement;
+  const results = document.getElementById('results') as HTMLDivElement;
+  const resultsBody = document.getElementById('results-body') as HTMLTableSectionElement;
+
+  function parseIp(ip: string): number | null {
+    const parts = ip.trim().split('.');
+    if (parts.length !== 4) return null;
+    let value = 0;
+    for (const part of parts) {
+      if (!/^\d{1,3}$/.test(part)) return null;
+      const n = Number(part);
+      if (n < 0 || n > 255) return null;
+      value = (value << 8) | n;
+    }
+    return value >>> 0;
+  }
+
+  function intToIp(n: number): string {
+    return [24, 16, 8, 0].map((shift) => (n >>> shift) & 0xff).join('.');
+  }
+
+  function calculate() {
+    const ipStr = ipInput.value;
+    const cidr = Number(cidrInput.value);
+
+    const ipInt = parseIp(ipStr);
+    if (ipInt === null) {
+      showError('That doesn\u2019t look like a valid IPv4 address (expected four numbers 0\u2013255, separated by dots).');
+      return;
+    }
+    if (!Number.isInteger(cidr) || cidr < 0 || cidr > 32) {
+      showError('CIDR prefix must be a whole number between 0 and 32.');
+      return;
+    }
+
+    errorMsg.style.display = 'none';
+
+    const mask = cidr === 0 ? 0 : (0xffffffff << (32 - cidr)) >>> 0;
+    const wildcard = (~mask) >>> 0;
+    const network = (ipInt & mask) >>> 0;
+    const broadcast = (network | wildcard) >>> 0;
+    const total = Math.pow(2, 32 - cidr);
+
+    let firstHost: string, lastHost: string, usable: number;
+    if (cidr === 32) {
+      firstHost = intToIp(ipInt);
+      lastHost = intToIp(ipInt);
+      usable = 1;
+    } else if (cidr === 31) {
+      firstHost = intToIp(network);
+      lastHost = intToIp(broadcast);
+      usable = 2;
+    } else {
+      firstHost = intToIp((network + 1) >>> 0);
+      lastHost = intToIp((broadcast - 1) >>> 0);
+      usable = total - 2;
+    }
+
+    const rows: [string, string][] = [
+      ['Network address', intToIp(network)],
+      ['Broadcast address', intToIp(broadcast)],
+      ['Subnet mask', intToIp(mask)],
+      ['Wildcard mask', intToIp(wildcard)],
+      ['First usable host', firstHost],
+      ['Last usable host', lastHost],
+      ['Total addresses', total.toLocaleString()],
+      ['Usable hosts', usable.toLocaleString()]
+    ];
+
+    resultsBody.innerHTML = '';
+    for (const [label, value] of rows) {
+      const tr = document.createElement('tr');
+      const tdLabel = document.createElement('td');
+      tdLabel.textContent = label;
+      const tdValue = document.createElement('td');
+      tdValue.textContent = value;
+      tr.append(tdLabel, tdValue);
+      resultsBody.appendChild(tr);
+    }
+
+    results.style.display = 'block';
+  }
+
+  function showError(message: string) {
+    errorMsg.textContent = message;
+    errorMsg.style.display = 'block';
+    results.style.display = 'none';
+  }
+
+  ipInput.addEventListener('input', calculate);
+  cidrInput.addEventListener('input', calculate);
+  calculate();
+</script>
