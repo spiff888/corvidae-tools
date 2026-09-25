@@ -1,0 +1,201 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Chough — QR code generator — corvidae.tools" description="Generate a QR code from any text or URL, with an optional logo overlay and a choice of export sizes, entirely in your browser.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Chough</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Pyrrhocorax pyrrhocorax</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Turn text or a URL into a QR code. Drop in a logo if you want one in the middle, then export at whatever size you need.</p>
+    </div>
+    <img src="/chough-mark.png" alt="" class="mascot" />
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 40px; margin: 32px 0;">
+    <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 20px;">
+
+      <div>
+        <label for="text-input" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Text or URL</label>
+        <textarea id="text-input" rows="3" placeholder="https://corvidae.tools" style="width: 100%; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; resize: vertical;"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div>
+          <label for="size-select" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Export size</label>
+          <select id="size-select" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px;">
+            <option value="256">256 &times; 256</option>
+            <option value="512" selected>512 &times; 512</option>
+            <option value="1024">1024 &times; 1024</option>
+            <option value="2048">2048 &times; 2048</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="ec-select" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Error correction</label>
+          <select id="ec-select" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px;">
+            <option value="L">L &mdash; low</option>
+            <option value="M" selected>M &mdash; medium</option>
+            <option value="Q">Q &mdash; quartile</option>
+            <option value="H">H &mdash; high (best with a logo)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div>
+          <label for="fg-color" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Foreground</label>
+          <input type="color" id="fg-color" value="#000000" style="width: 60px; height: 40px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;" />
+        </div>
+        <div>
+          <label for="bg-color" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Background</label>
+          <input type="color" id="bg-color" value="#ffffff" style="width: 60px; height: 40px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;" />
+        </div>
+      </div>
+
+      <div>
+        <label for="logo-input" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Logo overlay (optional)</label>
+        <input type="file" id="logo-input" accept="image/*" style="font-family: var(--font-mono); font-size: 13px; color: var(--text-dim);" />
+        <button id="clear-logo-btn" style="display: none; margin-left: 12px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 6px 12px; border-radius: 8px; font-family: var(--font-mono); font-size: 12px; cursor: pointer;">Remove logo</button>
+        <p id="ec-warning" style="display: none; margin: 8px 0 0; font-size: 13px; color: #e0b374; font-family: var(--font-mono);">A logo covers part of the code &mdash; high error correction is recommended so it still scans.</p>
+      </div>
+
+      <div style="display: flex; gap: 12px;">
+        <button id="download-png-btn" style="background: var(--accent); border: none; color: #0d0d0f; padding: 10px 20px; border-radius: 8px; font-family: var(--font-mono); font-weight: 700; font-size: 13px; cursor: pointer;">Download PNG</button>
+        <button id="download-svg-btn" style="background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 10px 20px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; cursor: pointer;">Download SVG</button>
+      </div>
+      <p style="margin: -8px 0 0; font-size: 12px; color: var(--text-faint); font-family: var(--font-mono);">SVG export doesn't include the logo overlay.</p>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; justify-content: center; flex: 1; min-width: 280px;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: inline-flex;">
+        <canvas id="qr-canvas" style="max-width: 320px; width: 100%; height: auto; display: block; border-radius: 8px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <Footer />
+</Layout>
+
+<script>
+  import QRCode from 'qrcode';
+
+  const textInput = document.getElementById('text-input') as HTMLTextAreaElement;
+  const sizeSelect = document.getElementById('size-select') as HTMLSelectElement;
+  const ecSelect = document.getElementById('ec-select') as HTMLSelectElement;
+  const fgColor = document.getElementById('fg-color') as HTMLInputElement;
+  const bgColor = document.getElementById('bg-color') as HTMLInputElement;
+  const logoInput = document.getElementById('logo-input') as HTMLInputElement;
+  const clearLogoBtn = document.getElementById('clear-logo-btn') as HTMLButtonElement;
+  const ecWarning = document.getElementById('ec-warning') as HTMLParagraphElement;
+  const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+  const downloadPngBtn = document.getElementById('download-png-btn') as HTMLButtonElement;
+  const downloadSvgBtn = document.getElementById('download-svg-btn') as HTMLButtonElement;
+
+  let logoImage: HTMLImageElement | null = null;
+
+  function currentText(): string {
+    return textInput.value.trim() || 'https://corvidae.tools';
+  }
+
+  async function render() {
+    const size = Number(sizeSelect.value);
+    const ec = ecSelect.value as 'L' | 'M' | 'Q' | 'H';
+
+    canvas.width = size;
+    canvas.height = size;
+
+    try {
+      await QRCode.toCanvas(canvas, currentText(), {
+        errorCorrectionLevel: ec,
+        width: size,
+        margin: 2,
+        color: { dark: fgColor.value, light: bgColor.value }
+      });
+    } catch (err) {
+      console.error(err);
+      return;
+    }
+
+    if (logoImage) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const logoSize = size * 0.22;
+        const pad = logoSize * 0.18;
+        const cx = size / 2;
+        const cy = size / 2;
+
+        ctx.fillStyle = bgColor.value;
+        ctx.fillRect(cx - logoSize / 2 - pad, cy - logoSize / 2 - pad, logoSize + pad * 2, logoSize + pad * 2);
+        ctx.drawImage(logoImage, cx - logoSize / 2, cy - logoSize / 2, logoSize, logoSize);
+      }
+    }
+
+    ecWarning.style.display = logoImage && ec !== 'H' ? 'block' : 'none';
+  }
+
+  [textInput, sizeSelect, ecSelect, fgColor, bgColor].forEach((el) => {
+    el.addEventListener('input', render);
+  });
+
+  logoInput.addEventListener('change', () => {
+    const file = logoInput.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      logoImage = img;
+      clearLogoBtn.style.display = 'inline-block';
+      if (ecSelect.value !== 'H') ecSelect.value = 'H';
+      render();
+    };
+    img.src = url;
+  });
+
+  clearLogoBtn.addEventListener('click', () => {
+    logoImage = null;
+    logoInput.value = '';
+    clearLogoBtn.style.display = 'none';
+    render();
+  });
+
+  downloadPngBtn.addEventListener('click', () => {
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'qr-code.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+
+  downloadSvgBtn.addEventListener('click', async () => {
+    try {
+      const svg = await QRCode.toString(currentText(), {
+        type: 'svg',
+        errorCorrectionLevel: ecSelect.value as 'L' | 'M' | 'Q' | 'H',
+        margin: 2,
+        color: { dark: fgColor.value, light: bgColor.value }
+      });
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'qr-code.svg';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    }
+  });
+
+  textInput.value = 'https://corvidae.tools';
+  render();
+</script>
