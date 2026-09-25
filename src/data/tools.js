@@ -22,7 +22,7 @@ export const tools = [
     name: 'Chough',
     latin: 'Pyrrhocorax pyrrhocorax',
     description: 'QR code generator, with logo overlay and export sizes.',
-    status: 'planned'
+    status: 'beta'
   },
   // {
   //  slug: 'magpie',
@@ -36,6 +36,6 @@ export const tools = [
     name: 'Rook',
     latin: 'Corvus frugilegus',
     description: 'Subnet Calculator',
-    status: 'planned'
+    status: 'beta'
   }
 ];
