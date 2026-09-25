@@ -36,6 +36,6 @@ export const tools = [
     name: 'Rook',
     latin: 'Corvus frugilegus',
     description: 'Subnet Calculator',
-    status: 'beta'
+    status: 'live'
   }
 ];
