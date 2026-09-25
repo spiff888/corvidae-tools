@@ -74,7 +74,7 @@ import Footer from '../../components/Footer.astro';
 
     <div style="display: flex; align-items: flex-start; justify-content: center; flex: 1; min-width: 280px;">
       <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: inline-flex;">
-        <canvas id="qr-canvas" style="max-width: 320px; width: 100%; height: auto; display: block; border-radius: 8px; image-rendering: pixelated; image-rendering: crisp-edges;"></canvas>
+        <canvas id="qr-canvas" style="width: 320px; height: 320px; max-width: 100%; aspect-ratio: 1; display: block; border-radius: 8px;"></canvas>
       </div>
     </div>
   </div>
@@ -103,43 +103,50 @@ import Footer from '../../components/Footer.astro';
     return textInput.value.trim() || 'https://corvidae.tools';
   }
 
-  async function render() {
-    const size = Number(sizeSelect.value);
-    const ec = ecSelect.value as 'L' | 'M' | 'Q' | 'H';
-
-    canvas.width = size;
-    canvas.height = size;
-
+  const PREVIEW_SIZE = 320;
+  
+  async function buildQR(size: number): Promise<HTMLCanvasElement | null> {
+    const c = document.createElement('canvas');
     try {
-      await QRCode.toCanvas(canvas, currentText(), {
-        errorCorrectionLevel: ec,
+      await QRCode.toCanvas(c, currentText(), {
+        errorCorrectionLevel: ecSelect.value as 'L' | 'M' | 'Q' | 'H',
         width: size,
         margin: 2,
         color: { dark: fgColor.value, light: bgColor.value }
       });
     } catch (err) {
       console.error(err);
-      return;
+      return null;
     }
-
+  
     if (logoImage) {
-      const ctx = canvas.getContext('2d');
+      const ctx = c.getContext('2d');
       if (ctx) {
         const logoSize = size * 0.22;
         const pad = logoSize * 0.18;
         const cx = size / 2;
         const cy = size / 2;
-
         ctx.fillStyle = bgColor.value;
         ctx.fillRect(cx - logoSize / 2 - pad, cy - logoSize / 2 - pad, logoSize + pad * 2, logoSize + pad * 2);
         ctx.drawImage(logoImage, cx - logoSize / 2, cy - logoSize / 2, logoSize, logoSize);
       }
     }
-
-    ecWarning.style.display = logoImage && ec !== 'H' ? 'block' : 'none';
+    return c;
   }
-
-  [textInput, sizeSelect, ecSelect, fgColor, bgColor].forEach((el) => {
+  
+  async function render() {
+    const px = Math.round(PREVIEW_SIZE * (window.devicePixelRatio || 1));
+    const qr = await buildQR(px);
+    if (!qr) return;
+  
+    canvas.width = px;
+    canvas.height = px;
+    canvas.getContext('2d')?.drawImage(qr, 0, 0);
+  
+    ecWarning.style.display = logoImage && ecSelect.value !== 'H' ? 'block' : 'none';
+  }
+  
+  [textInput, ecSelect, fgColor, bgColor].forEach((el) => {
     el.addEventListener('input', render);
   });
 
@@ -164,13 +171,15 @@ import Footer from '../../components/Footer.astro';
     render();
   });
 
-  downloadPngBtn.addEventListener('click', () => {
-    canvas.toBlob((blob) => {
+  downloadPngBtn.addEventListener('click', async () => {
+    const qr = await buildQR(Number(sizeSelect.value));
+    if (!qr) return;
+    qr.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'qr-code.png';
+      a.download = `qr-code-${sizeSelect.value}.png`;
       a.click();
       URL.revokeObjectURL(url);
     }, 'image/png');
@@ -196,6 +205,5 @@ import Footer from '../../components/Footer.astro';
     }
   });
 
-  textInput.value = 'https://corvidae.tools';
   render();
 </script>
