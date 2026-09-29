@@ -1,0 +1,883 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+
+const switches = Array.from({ length: 10 }, (_, i) => ({
+  n: i + 1,
+  weight: i < 9 ? 2 ** i : null
+}));
+
+const universeRows = [
+  ['u-console', 'Universe / address'],
+  ['u-absolute', 'Absolute address'],
+  ['u-range', 'This universe spans'],
+  ['u-sacn', 'sACN universe'],
+  ['u-mcast', 'sACN multicast group'],
+  ['u-artnet', 'Art-Net port-address'],
+  ['u-artnet-split', 'Art-Net net / sub-net / universe']
+];
+---
+
+<Layout title="Blue Jay — DMX DIP switch &amp; address calculator — corvidae.tools" description="Convert DMX addresses to DIP switch settings and back, and translate between universe, absolute, Art-Net and sACN addressing, entirely in your browser.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Blue Jay</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Cyanocitta cristata</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Set a fixture's DIP switches from a DMX address (or read the address off the switches), translate universes between console, Art-Net and sACN numbering, and patch a whole rig.</p>
+    </div>
+    <img src="/blue-jay-mark.png" alt="" width="220" style="width: 220px; height: auto; flex-shrink: 0;" />
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Blue Jay tools">
+    <button type="button" class="tab" role="tab" id="tab-addressing" aria-controls="panel-addressing" aria-selected="true">Addressing</button>
+    <button type="button" class="tab" role="tab" id="tab-patch" aria-controls="panel-patch" aria-selected="false">Patch planner</button>
+  </div>
+
+  <div id="panel-addressing" role="tabpanel" aria-labelledby="tab-addressing">
+  <!-- DIP switches -->
+  <section class="section">
+    <h2>DIP switches</h2>
+    <p class="hint">Type an address or flip the switches. Switches 1&ndash;9 add up to the address; switch 10 is usually a mode or termination switch.</p>
+
+    <div class="row">
+      <div>
+        <label for="addr-input">DMX address</label>
+        <input type="number" id="addr-input" class="field" min="1" max="512" value="1" style="width: 120px;" />
+      </div>
+      <div>
+        <label for="footprint-input">Fixture channels</label>
+        <input type="number" id="footprint-input" class="field" min="1" max="512" value="1" style="width: 120px;" />
+      </div>
+      <div>
+        <label for="mode-select">Fixture convention</label>
+        <select id="mode-select" class="field">
+          <option value="sum" selected>Address = switch total</option>
+          <option value="plus1">Address = switch total + 1</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="dip" role="group" aria-label="DIP switch bank">
+      <span class="dip-on" aria-hidden="true">ON &uarr;</span>
+      <div class="dip-switches">
+        {switches.map((s) => (
+          <div class="dip-col">
+            <button type="button" class="dip-switch" data-n={s.n} aria-pressed="false" aria-label={`Switch ${s.n}${s.weight ? `, worth ${s.weight}` : ', not part of the address'}`}>
+              <span class="dip-knob"></span>
+            </button>
+            <span class="dip-num">{s.n}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div class="dip-weights" aria-hidden="true">
+      {switches.map((s) => <span>{s.weight ?? '\u2014'}</span>)}
+    </div>
+
+    <p id="dip-summary" class="summary"></p>
+    <p id="dip-warning" class="warning" style="display: none;"></p>
+  </section>
+
+  <!-- Universe conversion -->
+  <section class="section">
+    <h2>Universe and address</h2>
+    <p class="hint">Enter an absolute address (<code>557</code>) or a universe and address (<code>2.45</code>, <code>2/45</code>).</p>
+
+    <div class="row">
+      <div>
+        <label for="u-input">Address</label>
+        <input type="text" id="u-input" class="field" value="2.45" spellcheck="false" autocomplete="off" data-1p-ignore data-lpignore="true" style="width: 200px;" />
+      </div>
+      <div>
+        <label for="u-base">Universe numbering you typed</label>
+        <select id="u-base" class="field">
+          <option value="1" selected>Starts at 1 (most consoles, sACN)</option>
+          <option value="0">Starts at 0 (Art-Net)</option>
+        </select>
+      </div>
+    </div>
+
+    <p id="u-error" class="warning" style="display: none;"></p>
+
+    <div id="u-results" class="results">
+      <table>
+        <tbody>
+          {universeRows.map(([id, label]) => (
+            <tr>
+              <td>{label}</td>
+              <td id={id}></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top: 12px;">Art-Net counts universes from 0 and sACN from 1, so console universe 1 is Art-Net 0. If a fixture responds one universe off, this is usually why.</p>
+  </section>
+
+  </div>
+
+  <div id="panel-patch" role="tabpanel" aria-labelledby="tab-patch" hidden>
+    <section class="section">
+      <h2>Patch planner</h2>
+      <p class="hint">List your fixture types with their channel count and quantity. Addresses are assigned in order, and a fixture that won&rsquo;t fit in what&rsquo;s left of a universe starts on the next one. Your list is saved in this browser.</p>
+
+      <div class="row">
+        <div>
+          <label for="p-start-universe">Start universe</label>
+          <input type="number" id="p-start-universe" class="field" min="1" value="1" style="width: 120px;" />
+        </div>
+        <div>
+          <label for="p-start-address">Start address</label>
+          <input type="number" id="p-start-address" class="field" min="1" max="512" value="1" style="width: 120px;" />
+        </div>
+        <div>
+          <label for="p-split">Universe boundaries</label>
+          <select id="p-split" class="field">
+            <option value="no" selected>Never split a fixture</option>
+            <option value="yes">Allow splitting (pack tightly)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fixture-head" aria-hidden="true">
+        <span>Fixture</span><span>Channels</span><span>Qty</span><span></span>
+      </div>
+      <div id="fixture-list"></div>
+      <p class="hint" style="margin: 12px 0 0;">Channels is the fixture's DMX mode (for example 7CH or 36CH), shown in its menu or manual, not the number of lamps.</p>
+
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 32px;">
+        <button type="button" id="p-add" class="btn-primary">Add fixture</button>
+        <button type="button" id="p-csv" class="btn-secondary">Download CSV</button>
+        <button type="button" id="p-clear" class="btn-secondary">Clear list</button>
+      </div>
+
+      <p id="p-summary" class="summary" style="margin-top: 0;"></p>
+      <p id="p-warning" class="warning" style="display: none;"></p>
+
+      <div id="p-output" class="results patch-results" style="margin-top: 20px;">
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr><th>Fixture</th><th>Universe</th><th>Address</th><th>Channels</th><th>Console</th><th>DIP on</th></tr>
+            </thead>
+            <tbody id="p-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="hint" style="margin-top: 12px;">The DIP column follows the fixture convention set on the Addressing tab.</p>
+    </section>
+  </div>
+
+  <Footer />
+</Layout>
+
+<style>
+  .section {
+    margin: 48px 0;
+  }
+  h2 {
+    font-size: 20px;
+    margin: 0 0 6px;
+  }
+  .hint {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    max-width: 640px;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 24px;
+  }
+  label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  :global(.field) {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    max-width: 100%;
+    height: 40px;
+  }
+  :global(.field:focus-visible),
+  .dip-switch:focus-visible,
+  .tab:focus-visible,
+  :global(.icon-btn:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* DIP switch bank: modelled on the red blocks found on fixture rear panels */
+  .dip {
+    position: relative;
+    max-width: 520px;
+    background: #1f4c9e;
+    border-radius: 6px;
+    padding: 30px 16px 10px;
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+  }
+  .dip-on {
+    position: absolute;
+    top: 8px;
+    left: 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: #e6edf8;
+  }
+  .dip-switches {
+    display: flex;
+    gap: 8px;
+  }
+  .dip-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .dip-switch {
+    width: 100%;
+    max-width: 38px;
+    height: 72px;
+    padding: 4px;
+    border: none;
+    border-radius: 3px;
+    background: #0b1a36;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-end;
+  }
+  .dip-switch[aria-pressed='true'] {
+    align-items: flex-start;
+  }
+  .dip-knob {
+    display: block;
+    width: 100%;
+    height: 30px;
+    border-radius: 2px;
+    background: #f3eee8;
+    box-shadow: inset 0 -2px 0 #c9c1b8;
+    transition: transform 0.08s ease;
+  }
+  .dip-switch:active .dip-knob {
+    transform: scale(0.94);
+  }
+  .dip-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: #e6edf8;
+  }
+  .dip-weights {
+    display: flex;
+    gap: 8px;
+    max-width: 520px;
+    padding: 8px 16px 0;
+  }
+  .dip-weights span {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .summary {
+    margin: 20px 0 0;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .warning {
+    margin: 12px 0 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: #e0b374;
+    max-width: 640px;
+  }
+
+  .results {
+    max-width: 560px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 14px;
+  }
+  tr {
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child {
+    border-bottom: none;
+  }
+  td {
+    padding: 14px 20px;
+  }
+  td:first-child {
+    color: var(--text-faint);
+  }
+  td:last-child {
+    color: var(--text);
+    text-align: right;
+    font-weight: 700;
+  }
+
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 24px 0 8px;
+  }
+  .tab {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .tab[aria-selected='true'] {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .section:first-child {
+    margin-top: 32px;
+  }
+
+  /* Patch planner */
+  .fixture-head,
+  #fixture-list :global(.fixture-row) {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) 110px 90px 40px;
+    gap: 12px;
+    align-items: center;
+    max-width: 640px;
+  }
+  .fixture-head {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  #fixture-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #fixture-list :global(.field) {
+    width: 100%;
+  }
+  #fixture-list :global(.icon-btn) {
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #fixture-list :global(.icon-btn:hover) {
+    color: var(--text);
+    border-color: var(--text-faint);
+  }
+  .btn-primary {
+    background: var(--accent);
+    border: none;
+    color: #0d0d0f;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .patch-results {
+    max-width: none;
+  }
+  .scroll {
+    overflow-x: auto;
+  }
+  .patch-results th {
+    text-align: left;
+    padding: 12px 20px;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  #p-body :global(tr) {
+    border-bottom: 1px solid var(--border);
+  }
+  #p-body :global(tr:last-child) {
+    border-bottom: none;
+  }
+  #p-body :global(td) {
+    padding: 10px 20px;
+    text-align: left;
+    font-weight: 400;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  #p-body :global(td:first-child) {
+    color: var(--text);
+  }
+  #p-body :global(td.addr) {
+    color: var(--text);
+    font-weight: 700;
+  }
+  #p-body :global(tr.universe-start td) {
+    border-top: 1px solid var(--text-faint);
+  }
+
+  @media (max-width: 560px) {
+    .fixture-head,
+    #fixture-list :global(.fixture-row) {
+      grid-template-columns: minmax(0, 1fr) 72px 60px 40px;
+      gap: 8px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dip-knob {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  // ---------- DIP switches ----------
+  const addrInput = document.getElementById('addr-input') as HTMLInputElement;
+  const footprintInput = document.getElementById('footprint-input') as HTMLInputElement;
+  const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;
+  const dipSummary = document.getElementById('dip-summary') as HTMLParagraphElement;
+  const dipWarning = document.getElementById('dip-warning') as HTMLParagraphElement;
+  const switchEls = Array.from(document.querySelectorAll<HTMLButtonElement>('.dip-switch'));
+
+  const isOn = (el: HTMLButtonElement) => el.getAttribute('aria-pressed') === 'true';
+  const setOn = (el: HTMLButtonElement, on: boolean) => el.setAttribute('aria-pressed', String(on));
+  const offset = () => (modeSelect.value === 'plus1' ? 1 : 0);
+
+  function switchTotal(): number {
+    return switchEls.slice(0, 9).reduce((sum, el, i) => sum + (isOn(el) ? 2 ** i : 0), 0);
+  }
+
+  function updateDipText() {
+    const address = switchTotal() + offset();
+    const footprint = Math.max(1, Math.floor(Number(footprintInput.value)) || 1);
+    const onList = switchEls.slice(0, 9).filter(isOn).map((el) => el.dataset.n);
+
+    const warnings: string[] = [];
+    if (address === 0) {
+      warnings.push('All address switches off gives address 0, which isn\u2019t a valid DMX address. Most fixtures treat it as 1.');
+    }
+    const last = address + footprint - 1;
+    if (address > 0 && last > 512) {
+      warnings.push(`A ${footprint}-channel fixture at ${address} would run to channel ${last}, past the end of the universe (512). Move it to ${513 - footprint} or lower, or to the next universe.`);
+    }
+
+    dipSummary.textContent =
+      address === 0
+        ? 'No address switches on.'
+        : `Address ${address}` +
+          (footprint > 1 ? `, using channels ${address}\u2013${Math.min(last, 512)}` : '') +
+          `. Switches on: ${onList.length ? onList.join(', ') : 'none'}.`;
+
+    dipWarning.textContent = warnings.join(' ');
+    dipWarning.style.display = warnings.length ? 'block' : 'none';
+  }
+
+  function setSwitchesFromAddress() {
+    const address = Math.floor(Number(addrInput.value));
+    const total = address - offset();
+    if (!Number.isFinite(address) || address < 1 || address > 512) {
+      dipWarning.textContent = 'Enter an address from 1 to 512.';
+      dipWarning.style.display = 'block';
+      return;
+    }
+    if (total > 511) {
+      dipWarning.textContent = 'Nine switches only reach 511. Address 512 needs a fixture that uses the \u201cswitch total + 1\u201d convention.';
+      dipWarning.style.display = 'block';
+      return;
+    }
+    switchEls.slice(0, 9).forEach((el, i) => setOn(el, ((total >> i) & 1) === 1));
+    updateDipText();
+  }
+
+  switchEls.forEach((el, i) => {
+    el.addEventListener('click', () => {
+      setOn(el, !isOn(el));
+      if (i < 9) {
+        const address = switchTotal() + offset();
+        addrInput.value = address === 0 ? '' : String(address);
+      }
+      updateDipText();
+    });
+  });
+
+  addrInput.addEventListener('input', setSwitchesFromAddress);
+  footprintInput.addEventListener('input', updateDipText);
+  // Changing the convention keeps the typed address and re-derives the switches.
+  modeSelect.addEventListener('change', setSwitchesFromAddress);
+
+  setSwitchesFromAddress();
+
+  // ---------- Universe conversion ----------
+  const uInput = document.getElementById('u-input') as HTMLInputElement;
+  const uBase = document.getElementById('u-base') as HTMLSelectElement;
+  const uError = document.getElementById('u-error') as HTMLParagraphElement;
+  const uResults = document.getElementById('u-results') as HTMLDivElement;
+  const cell = (id: string) => document.getElementById(id) as HTMLTableCellElement;
+
+  const MAX_SACN = 63999;
+  const MAX_ARTNET = 32767;
+
+  function showUError(msg: string) {
+    uError.textContent = msg;
+    uError.style.display = 'block';
+    uResults.style.display = 'none';
+  }
+
+  function convertUniverse() {
+    const raw = uInput.value.trim();
+    let universe: number; // always 1-based internally
+    let address: number;
+
+    const split = raw.match(/^(\d+)\s*[.\/:]\s*(\d+)$/);
+    if (split) {
+      universe = Number(split[1]) + (uBase.value === '0' ? 1 : 0);
+      address = Number(split[2]);
+      if (address < 1 || address > 512) return showUError('The address part must be from 1 to 512.');
+      if (universe < 1) return showUError('Universe must be 1 or higher when numbering starts at 1.');
+    } else if (/^\d+$/.test(raw)) {
+      const absolute = Number(raw);
+      if (absolute < 1) return showUError('Absolute addresses start at 1.');
+      universe = Math.floor((absolute - 1) / 512) + 1;
+      address = ((absolute - 1) % 512) + 1;
+    } else {
+      return showUError('Enter a number like 557, or a universe and address like 2.45 or 2/45.');
+    }
+
+    if (universe > MAX_SACN) return showUError(`That\u2019s past the highest sACN universe (${MAX_SACN.toLocaleString()}).`);
+
+    uError.style.display = 'none';
+    uResults.style.display = 'block';
+
+    const absolute = (universe - 1) * 512 + address;
+    const start = (universe - 1) * 512 + 1;
+    const port = universe - 1;
+
+    cell('u-console').textContent = `${universe} / ${address}  (${universe}.${String(address).padStart(3, '0')})`;
+    cell('u-absolute').textContent = absolute.toLocaleString();
+    cell('u-range').textContent = `${start.toLocaleString()}\u2013${(start + 511).toLocaleString()}`;
+    cell('u-sacn').textContent = String(universe);
+    cell('u-mcast').textContent = `239.255.${universe >> 8}.${universe & 0xff}`;
+    if (port > MAX_ARTNET) {
+      cell('u-artnet').textContent = 'Out of range';
+      cell('u-artnet-split').textContent = '\u2014';
+    } else {
+      cell('u-artnet').textContent = String(port);
+      cell('u-artnet-split').textContent = `${(port >> 8) & 0x7f} / ${(port >> 4) & 0xf} / ${port & 0xf}`;
+    }
+  }
+
+  uInput.addEventListener('input', convertUniverse);
+  uBase.addEventListener('change', convertUniverse);
+  convertUniverse();
+
+  // ---------- Tabs ----------
+  const tabs = [
+    { btn: document.getElementById('tab-addressing') as HTMLButtonElement, panel: document.getElementById('panel-addressing') as HTMLDivElement, hash: '' },
+    { btn: document.getElementById('tab-patch') as HTMLButtonElement, panel: document.getElementById('panel-patch') as HTMLDivElement, hash: '#patch' }
+  ];
+
+  function showTab(index: number, updateHash = true) {
+    tabs.forEach((t, i) => {
+      t.btn.setAttribute('aria-selected', String(i === index));
+      t.panel.hidden = i !== index;
+    });
+    if (updateHash) history.replaceState(null, '', tabs[index].hash || location.pathname);
+  }
+
+  tabs.forEach((t, i) => t.btn.addEventListener('click', () => showTab(i)));
+  showTab(location.hash === '#patch' ? 1 : 0, false);
+
+  // ---------- Patch planner ----------
+  type Fixture = { name: string; channels: number; qty: number };
+
+  const STORAGE_KEY = 'bluejay-patch-v1';
+  const EXAMPLE: Fixture[] = [
+    { name: 'Moving head', channels: 16, qty: 8 },
+    { name: 'LED par', channels: 7, qty: 24 },
+    { name: 'LED batten', channels: 36, qty: 7 }
+  ];
+
+  const fixtureList = document.getElementById('fixture-list') as HTMLDivElement;
+  const pStartU = document.getElementById('p-start-universe') as HTMLInputElement;
+  const pStartA = document.getElementById('p-start-address') as HTMLInputElement;
+  const pSplit = document.getElementById('p-split') as HTMLSelectElement;
+  const pSummary = document.getElementById('p-summary') as HTMLParagraphElement;
+  const pWarning = document.getElementById('p-warning') as HTMLParagraphElement;
+  const pOutput = document.getElementById('p-output') as HTMLDivElement;
+  const pBody = document.getElementById('p-body') as HTMLTableSectionElement;
+
+  let fixtures: Fixture[] = loadFixtures();
+
+  function loadFixtures(): Fixture[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.fixtures)) {
+          pStartU.value = String(parsed.startUniverse ?? 1);
+          pStartA.value = String(parsed.startAddress ?? 1);
+          pSplit.value = parsed.split === 'yes' ? 'yes' : 'no';
+          return parsed.fixtures;
+        }
+      }
+    } catch {
+      /* storage unavailable or corrupt: fall back to the example */
+    }
+    return EXAMPLE.map((f) => ({ ...f }));
+  }
+
+  function saveFixtures() {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ fixtures, startUniverse: pStartU.value, startAddress: pStartA.value, split: pSplit.value })
+      );
+    } catch {
+      /* private browsing or storage full: the planner still works, it just won't persist */
+    }
+  }
+
+  function makeInput(type: string, value: string, label: string, onInput: (v: string) => void) {
+    const input = document.createElement('input');
+    input.type = type;
+    input.className = 'field';
+    input.value = value;
+    input.setAttribute('aria-label', label);
+    if (type === 'number') {
+      input.min = '1';
+      input.max = '512';
+    } else {
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+    }
+    input.addEventListener('input', () => onInput(input.value));
+    return input;
+  }
+
+  function renderFixtureRows() {
+    fixtureList.innerHTML = '';
+    fixtures.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'fixture-row';
+      const n = i + 1;
+      row.append(
+        makeInput('text', f.name, `Fixture ${n} name`, (v) => { f.name = v; recalc(); }),
+        makeInput('number', String(f.channels), `Fixture ${n} channels`, (v) => { f.channels = Math.floor(Number(v)); recalc(); }),
+        makeInput('number', String(f.qty), `Fixture ${n} quantity`, (v) => { f.qty = Math.floor(Number(v)); recalc(); })
+      );
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'icon-btn';
+      remove.textContent = '\u00d7';
+      remove.setAttribute('aria-label', `Remove ${f.name || `fixture ${n}`}`);
+      remove.addEventListener('click', () => {
+        fixtures.splice(i, 1);
+        renderFixtureRows();
+        recalc();
+      });
+      row.append(remove);
+      fixtureList.appendChild(row);
+    });
+  }
+
+  type Patched = { label: string; universe: number; address: number; end: number; endUniverse: number; channels: number };
+
+  function dipOn(address: number): string {
+    const total = address - offset();
+    if (total < 0 || total > 511) return '\u2014';
+    const on: number[] = [];
+    for (let i = 0; i < 9; i++) if ((total >> i) & 1) on.push(i + 1);
+    return on.length ? on.join(', ') : 'none';
+  }
+
+  let lastPatch: Patched[] = [];
+
+  function recalc() {
+    saveFixtures();
+    const warnings: string[] = [];
+    let universe = Math.max(1, Math.floor(Number(pStartU.value)) || 1);
+    let address = Math.min(512, Math.max(1, Math.floor(Number(pStartA.value)) || 1));
+    const allowSplit = pSplit.value === 'yes';
+    const firstUniverse = universe;
+    let used = 0;
+    let wasted = 0;
+    const out: Patched[] = [];
+
+    for (const f of fixtures) {
+      const ch = f.channels;
+      const qty = f.qty;
+      const name = f.name.trim() || 'Fixture';
+      if (!Number.isInteger(ch) || ch < 1 || ch > 512) {
+        warnings.push(`${name}: channels must be 1\u2013512.`);
+        continue;
+      }
+      if (!Number.isInteger(qty) || qty < 1) {
+        warnings.push(`${name}: quantity must be at least 1.`);
+        continue;
+      }
+      if (qty > 2000) {
+        warnings.push(`${name}: quantity capped at 2,000.`);
+      }
+      for (let n = 1; n <= Math.min(qty, 2000); n++) {
+        if (!allowSplit && address + ch - 1 > 512) {
+          wasted += 513 - address;
+          universe++;
+          address = 1;
+        }
+        const startU = universe;
+        const startA = address;
+        const absEnd = (universe - 1) * 512 + address + ch - 1;
+        const endU = Math.floor((absEnd - 1) / 512) + 1;
+        const endA = ((absEnd - 1) % 512) + 1;
+        out.push({ label: qty > 1 ? `${name} ${n}` : name, universe: startU, address: startA, end: endA, endUniverse: endU, channels: ch });
+        used += ch;
+        universe = endA === 512 ? endU + 1 : endU;
+        address = endA === 512 ? 1 : endA + 1;
+      }
+    }
+
+    lastPatch = out;
+    pBody.innerHTML = '';
+    let prevU = -1;
+    for (const p of out) {
+      const tr = document.createElement('tr');
+      if (prevU !== -1 && p.universe !== prevU) tr.className = 'universe-start';
+      prevU = p.universe;
+      const range = p.endUniverse === p.universe ? `${p.address}\u2013${p.end}` : `${p.address}\u2013${p.endUniverse}.${p.end}`;
+      const cells: [string, string?][] = [
+        [p.label],
+        [String(p.universe)],
+        [String(p.address), 'addr'],
+        [p.channels === 1 ? String(p.address) : range],
+        [`${p.universe}.${String(p.address).padStart(3, '0')}`],
+        [dipOn(p.address)]
+      ];
+      for (const [text, cls] of cells) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (cls) td.className = cls;
+        tr.appendChild(td);
+      }
+      pBody.appendChild(tr);
+    }
+
+    const lastU = out.length ? out[out.length - 1].endUniverse : firstUniverse;
+    const universes = out.length ? lastU - firstUniverse + 1 : 0;
+    pOutput.style.display = out.length ? 'block' : 'none';
+    pSummary.textContent = out.length
+      ? `${out.length} fixture${out.length === 1 ? '' : 's'}, ${used.toLocaleString()} channels across ${universes} universe${universes === 1 ? '' : 's'}` +
+        (wasted ? `, ${wasted} channel${wasted === 1 ? '' : 's'} left unused at universe ends.` : '.')
+      : 'Add a fixture to start the patch.';
+    if (allowSplit && out.some((p) => p.endUniverse !== p.universe)) {
+      warnings.push('Some fixtures cross a universe boundary. Most fixtures can\u2019t do this; switch to \u201cNever split\u201d unless yours can.');
+    }
+    pWarning.textContent = warnings.join(' ');
+    pWarning.style.display = warnings.length ? 'block' : 'none';
+  }
+
+  function csvCell(v: string | number) {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  (document.getElementById('p-csv') as HTMLButtonElement).addEventListener('click', () => {
+    const header = ['Fixture', 'Universe', 'Start address', 'End universe', 'End address', 'Channels', 'Console', 'Absolute start', 'DIP switches on'];
+    const lines = [header.join(',')];
+    for (const p of lastPatch) {
+      lines.push(
+        [p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address)]
+          .map(csvCell)
+          .join(',')
+      );
+    }
+    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dmx-patch.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  (document.getElementById('p-add') as HTMLButtonElement).addEventListener('click', () => {
+    fixtures.push({ name: '', channels: 1, qty: 1 });
+    renderFixtureRows();
+    recalc();
+    const inputs = fixtureList.querySelectorAll<HTMLInputElement>('.fixture-row:last-child input');
+    inputs[0]?.focus();
+  });
+
+  (document.getElementById('p-clear') as HTMLButtonElement).addEventListener('click', () => {
+    if (fixtures.length && !confirm('Clear every fixture from the list?')) return;
+    fixtures = [];
+    renderFixtureRows();
+    recalc();
+  });
+
+  [pStartU, pStartA].forEach((el) => el.addEventListener('input', recalc));
+  pSplit.addEventListener('change', recalc);
+  // Keep the DIP column in sync with the convention chosen on the Addressing tab.
+  modeSelect.addEventListener('change', recalc);
+
+  renderFixtureRows();
+  recalc();
+</script>

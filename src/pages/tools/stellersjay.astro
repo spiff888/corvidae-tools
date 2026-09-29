@@ -1,0 +1,375 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Steller's Jay — PoE &amp; UPS calculators — corvidae.tools" description="PoE budget calculator and UPS runtime estimator, entirely in your browser.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Steller's Jay</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Cyanocitta stelleri</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Two power-planning tools in one: PoE budget for a switch, and UPS runtime for a battery backup.</p>
+    </div>
+    <img src="/stellers-jay-mark.png" alt="" width="220" style="width: 220px; height: auto; flex-shrink: 0;" />
+  </div>
+
+  <div style="display: flex; gap: 12px; margin: 24px 0 8px;">
+    <button id="tab-poe-btn" class="tab-btn tab-btn-active">PoE Budget</button>
+    <button id="tab-ups-btn" class="tab-btn">UPS Runtime</button>
+  </div>
+
+  <div id="poe-section">
+
+  <div style="background: #14202a; border: 1px solid #2a4a63; border-radius: 12px; padding: 16px 20px; margin: 24px 0; font-size: 14px; color: #7fb0d6; font-family: var(--font-mono); line-height: 1.6;">
+    Switches usually reserve power by a device's negotiated <em>class</em> (its worst case), not its everyday draw. A PTZ camera that idles low can still spike near its class ceiling once its heater or wiper kicks in, budget for the class, not just what you see it pulling on a mild day.
+  </div>
+
+  <div style="display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 32px;">
+    <div>
+      <label for="budget-input" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Switch PoE budget (W)</label>
+      <input type="number" id="budget-input" value="370" min="0" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; width: 140px;" />
+    </div>
+    <button id="add-device-btn" style="background: var(--accent); border: none; color: #0d0d0f; padding: 10px 20px; border-radius: 8px; font-family: var(--font-mono); font-weight: 700; font-size: 13px; cursor: pointer;">+ Add device</button>
+  </div>
+
+  <div id="device-list" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;"></div>
+
+  <div class="card" style="max-width: 480px; padding: 24px 28px;">
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 14px;">
+      <tbody id="summary-body"></tbody>
+    </table>
+  </div>
+
+  </div>
+
+  <div id="ups-section" style="display: none;">
+
+  <div style="background: #14202a; border: 1px solid #2a4a63; border-radius: 12px; padding: 16px 20px; margin: 24px 0; font-size: 14px; color: #7fb0d6; font-family: var(--font-mono); line-height: 1.6;">
+    Battery runtime doesn't scale in a straight line with load. Rather than guess, this uses two real numbers off your UPS's own datasheet (most list runtime at two load points) and fits a curve between them, so the estimate is grounded in your specific unit, not a generic assumption.
+  </div>
+
+  <div style="margin-bottom: 24px;">
+    <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">Two points from your UPS's datasheet</div>
+    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <span style="font-family: var(--font-mono); font-size: 13px; color: var(--text-faint);">Point 1:</span>
+        <input type="number" id="ref-load1" value="300" min="1" style="width: 90px;" class="ups-input" /> <span style="color: var(--text-faint); font-family: var(--font-mono); font-size: 13px;">W for</span>
+        <input type="number" id="ref-runtime1" value="12" min="0.1" step="0.1" style="width: 80px;" class="ups-input" /> <span style="color: var(--text-faint); font-family: var(--font-mono); font-size: 13px;">min</span>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <span style="font-family: var(--font-mono); font-size: 13px; color: var(--text-faint);">Point 2:</span>
+        <input type="number" id="ref-load2" value="600" min="1" style="width: 90px;" class="ups-input" /> <span style="color: var(--text-faint); font-family: var(--font-mono); font-size: 13px;">W for</span>
+        <input type="number" id="ref-runtime2" value="4" min="0.1" step="0.1" style="width: 80px;" class="ups-input" /> <span style="color: var(--text-faint); font-family: var(--font-mono); font-size: 13px;">min</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 32px; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim);">
+    Don't know your load in watts? <strong>Watts = VA &times; power factor</strong> (about 0.6&ndash;0.7 for older equipment, 0.9&ndash;1.0 for modern PFC-corrected gear).
+    <span style="display: inline-flex; gap: 8px; align-items: center; margin-left: 12px;">
+      <input type="number" id="va-input" placeholder="VA" style="width: 80px;" class="ups-input" />
+      &times;
+      <input type="number" id="pf-input" value="0.7" step="0.05" min="0" max="1" style="width: 60px;" class="ups-input" />
+      =
+      <span id="va-result" style="color: var(--accent); font-weight: 700;">&mdash;</span> W
+    </span>
+  </div>
+
+  <div style="display: flex; gap: 40px; flex-wrap: wrap;">
+    <div class="card" style="max-width: 320px; padding: 24px 28px;">
+      <label for="target-load" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Your load (W)</label>
+      <input type="number" id="target-load" value="450" min="1" style="width: 100%; margin-bottom: 16px;" class="ups-input" />
+      <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-faint);">Estimated runtime</div>
+      <div id="runtime-result" style="font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--accent);">&mdash;</div>
+    </div>
+
+    <div class="card" style="max-width: 320px; padding: 24px 28px;">
+      <label for="target-runtime" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Runtime you need (min)</label>
+      <input type="number" id="target-runtime" value="8" min="0.1" step="0.1" style="width: 100%; margin-bottom: 16px;" class="ups-input" />
+      <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-faint);">Max load to hit it</div>
+      <div id="max-load-result" style="font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--accent);">&mdash;</div>
+    </div>
+  </div>
+
+  </div>
+
+  <Footer />
+</Layout>
+
+<style>
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab-btn-active {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .ups-input {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  :global(.device-row select),
+  :global(.device-row input[type="number"]),
+  :global(.device-row input[type="text"]) {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  #summary-body :global(tr) { border-bottom: 1px solid var(--border); }
+  #summary-body :global(tr:last-child) { border-bottom: none; }
+  #summary-body :global(td) { padding: 12px 0; }
+  #summary-body :global(td:last-child) { text-align: right; font-weight: 700; }
+</style>
+
+<script>
+  interface Device {
+    id: number;
+    label: string;
+    classValue: string; // 'custom' or '0'-'8'
+    customWatts: number;
+  }
+
+  const CLASS_WATTS: Record<string, number> = {
+    '0': 15.4,
+    '1': 4,
+    '2': 7,
+    '3': 15.4,
+    '4': 30,
+    '5': 45,
+    '6': 60,
+    '7': 75,
+    '8': 90
+  };
+
+  const budgetInput = document.getElementById('budget-input') as HTMLInputElement;
+  const addDeviceBtn = document.getElementById('add-device-btn') as HTMLButtonElement;
+  const deviceList = document.getElementById('device-list') as HTMLDivElement;
+  const summaryBody = document.getElementById('summary-body') as HTMLTableSectionElement;
+
+  let devices: Device[] = [];
+  let nextId = 1;
+
+  function wattsFor(device: Device): number {
+    if (device.classValue === 'custom') return device.customWatts || 0;
+    return CLASS_WATTS[device.classValue] ?? 0;
+  }
+
+  function render() {
+    deviceList.innerHTML = '';
+
+    devices.forEach((device) => {
+      const row = document.createElement('div');
+      row.className = 'device-row';
+      row.style.cssText = 'display: flex; gap: 12px; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; flex-wrap: wrap;';
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.placeholder = 'Device (optional)';
+      label.value = device.label;
+      label.style.width = '180px';
+      label.addEventListener('input', () => {
+        device.label = label.value;
+      });
+
+      const select = document.createElement('select');
+      select.innerHTML = `
+        <option value="custom">Custom wattage</option>
+        <option value="0">Class 0 &mdash; up to 15.4W</option>
+        <option value="1">Class 1 &mdash; up to 4W</option>
+        <option value="2">Class 2 &mdash; up to 7W</option>
+        <option value="3">Class 3 &mdash; up to 15.4W</option>
+        <option value="4">Class 4 (PoE+) &mdash; up to 30W</option>
+        <option value="5">Class 5 (PoE++) &mdash; up to 45W</option>
+        <option value="6">Class 6 &mdash; up to 60W</option>
+        <option value="7">Class 7 &mdash; up to 75W</option>
+        <option value="8">Class 8 &mdash; up to 90W</option>
+      `;
+      select.value = device.classValue;
+
+      const customInput = document.createElement('input');
+      customInput.type = 'number';
+      customInput.min = '0';
+      customInput.step = '0.1';
+      customInput.placeholder = 'Watts';
+      customInput.style.width = '90px';
+      customInput.value = device.customWatts ? String(device.customWatts) : '';
+      customInput.style.display = device.classValue === 'custom' ? 'block' : 'none';
+
+      select.addEventListener('change', () => {
+        device.classValue = select.value;
+        customInput.style.display = device.classValue === 'custom' ? 'block' : 'none';
+        renderSummary();
+      });
+      customInput.addEventListener('input', () => {
+        device.customWatts = Number(customInput.value) || 0;
+        renderSummary();
+      });
+
+      const wattsLabel = document.createElement('span');
+      wattsLabel.style.cssText = 'font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); min-width: 60px; text-align: right;';
+      wattsLabel.textContent = `${wattsFor(device).toFixed(1)}W`;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = '\u00d7';
+      removeBtn.style.cssText = 'background: transparent; border: none; color: var(--text-faint); font-size: 20px; line-height: 1; cursor: pointer; margin-left: auto;';
+      removeBtn.addEventListener('click', () => {
+        devices = devices.filter((d) => d.id !== device.id);
+        render();
+      });
+
+      // keep the watts label live as fields change, without a full re-render
+      const updateWattsLabel = () => { wattsLabel.textContent = `${wattsFor(device).toFixed(1)}W`; };
+      select.addEventListener('change', updateWattsLabel);
+      customInput.addEventListener('input', updateWattsLabel);
+
+      row.append(label, select, customInput, wattsLabel, removeBtn);
+      deviceList.appendChild(row);
+    });
+
+    renderSummary();
+  }
+
+  function renderSummary() {
+    const budget = Number(budgetInput.value) || 0;
+    const total = devices.reduce((sum, d) => sum + wattsFor(d), 0);
+    const remaining = budget - total;
+    const over = remaining < 0;
+
+    summaryBody.innerHTML = '';
+    const rows: [string, string, string?][] = [
+      ['Switch budget', `${budget.toFixed(1)}W`],
+      ['Devices', String(devices.length)],
+      ['Total reserved', `${total.toFixed(1)}W`],
+      [over ? 'Over budget by' : 'Headroom remaining', `${Math.abs(remaining).toFixed(1)}W`, over ? '#e08a8a' : 'var(--accent)']
+    ];
+    for (const [labelText, value, color] of rows) {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      td1.textContent = labelText;
+      td1.style.color = 'var(--text-faint)';
+      const td2 = document.createElement('td');
+      td2.textContent = value;
+      if (color) td2.style.color = color;
+      tr.append(td1, td2);
+      summaryBody.appendChild(tr);
+    }
+  }
+
+  addDeviceBtn.addEventListener('click', () => {
+    devices.push({ id: nextId++, label: '', classValue: '4', customWatts: 0 });
+    render();
+  });
+
+  budgetInput.addEventListener('input', renderSummary);
+
+  // seed with one example row
+  devices.push({ id: nextId++, label: 'Access point', classValue: '4', customWatts: 0 });
+  devices.push({ id: nextId++, label: 'PTZ camera', classValue: '6', customWatts: 0 });
+  render();
+
+  // --- Tab switching ---
+  const poeSection = document.getElementById('poe-section') as HTMLDivElement;
+  const upsSection = document.getElementById('ups-section') as HTMLDivElement;
+  const tabPoeBtn = document.getElementById('tab-poe-btn') as HTMLButtonElement;
+  const tabUpsBtn = document.getElementById('tab-ups-btn') as HTMLButtonElement;
+
+  tabPoeBtn.addEventListener('click', () => {
+    poeSection.style.display = 'block';
+    upsSection.style.display = 'none';
+    tabPoeBtn.classList.add('tab-btn-active');
+    tabUpsBtn.classList.remove('tab-btn-active');
+  });
+  tabUpsBtn.addEventListener('click', () => {
+    poeSection.style.display = 'none';
+    upsSection.style.display = 'block';
+    tabUpsBtn.classList.add('tab-btn-active');
+    tabPoeBtn.classList.remove('tab-btn-active');
+  });
+
+  // --- UPS runtime calculator ---
+  const refLoad1 = document.getElementById('ref-load1') as HTMLInputElement;
+  const refRuntime1 = document.getElementById('ref-runtime1') as HTMLInputElement;
+  const refLoad2 = document.getElementById('ref-load2') as HTMLInputElement;
+  const refRuntime2 = document.getElementById('ref-runtime2') as HTMLInputElement;
+  const targetLoadInput = document.getElementById('target-load') as HTMLInputElement;
+  const targetRuntimeInput = document.getElementById('target-runtime') as HTMLInputElement;
+  const runtimeResult = document.getElementById('runtime-result') as HTMLDivElement;
+  const maxLoadResult = document.getElementById('max-load-result') as HTMLDivElement;
+  const vaInput = document.getElementById('va-input') as HTMLInputElement;
+  const pfInput = document.getElementById('pf-input') as HTMLInputElement;
+  const vaResult = document.getElementById('va-result') as HTMLSpanElement;
+
+  function fitExponent(load1: number, runtime1: number, load2: number, runtime2: number): number | null {
+    if (load1 <= 0 || load2 <= 0 || runtime1 <= 0 || runtime2 <= 0 || load1 === load2) return null;
+    return Math.log(runtime1 / runtime2) / Math.log(load2 / load1);
+  }
+
+  function renderUps() {
+    const load1 = Number(refLoad1.value);
+    const runtime1 = Number(refRuntime1.value);
+    const load2 = Number(refLoad2.value);
+    const runtime2 = Number(refRuntime2.value);
+    const n = fitExponent(load1, runtime1, load2, runtime2);
+
+    if (n === null) {
+      runtimeResult.textContent = '\u2014';
+      maxLoadResult.textContent = '\u2014';
+      return;
+    }
+
+    const targetLoad = Number(targetLoadInput.value);
+    if (targetLoad > 0) {
+      const est = runtime1 * Math.pow(load1 / targetLoad, n);
+      runtimeResult.textContent = `${est.toFixed(1)} min`;
+    } else {
+      runtimeResult.textContent = '\u2014';
+    }
+
+    const targetRuntime = Number(targetRuntimeInput.value);
+    if (targetRuntime > 0 && n !== 0) {
+      const maxLoad = load1 * Math.pow(runtime1 / targetRuntime, 1 / n);
+      maxLoadResult.textContent = `${maxLoad.toFixed(0)} W`;
+    } else {
+      maxLoadResult.textContent = '\u2014';
+    }
+  }
+
+  [refLoad1, refRuntime1, refLoad2, refRuntime2, targetLoadInput, targetRuntimeInput].forEach((el) => {
+    el.addEventListener('input', renderUps);
+  });
+
+  vaInput.addEventListener('input', updateVaResult);
+  pfInput.addEventListener('input', updateVaResult);
+  function updateVaResult() {
+    const va = Number(vaInput.value);
+    const pf = Number(pfInput.value);
+    if (va > 0 && pf > 0) {
+      vaResult.textContent = (va * pf).toFixed(0);
+    } else {
+      vaResult.textContent = '\u2014';
+    }
+  }
+
+  renderUps();
+</script>
