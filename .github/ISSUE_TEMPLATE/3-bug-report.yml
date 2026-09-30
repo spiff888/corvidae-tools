@@ -1,0 +1,38 @@
+name: Report a problem
+description: Something is broken or gives a wrong result.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: This issue is public. Don't attach private files; describe them or use a harmless sample instead.
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool?
+      options:
+        - Jackdaw (image conversion)
+        - Nutcracker (PDF)
+        - Chough (QR codes)
+        - Rook (subnet calculator)
+        - Homepage / other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      placeholder: Steps, and the input you used.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: e.g. Safari on iPhone 15, Chrome on a Mac

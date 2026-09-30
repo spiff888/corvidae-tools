@@ -1,0 +1,28 @@
+name: Suggest a new tool
+description: An idea for a new browser-only tool.
+title: "Tool idea: "
+labels: ["tool idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Every tool on corvidae.tools runs entirely in the browser, so ideas that need a server, an account, or uploading files somewhere are a poor fit.
+        This issue is public, so leave out anything private.
+  - type: textarea
+    id: what
+    attributes:
+      label: What should the tool do?
+      placeholder: e.g. Convert a list of IP ranges into CIDR blocks.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: When would you use it?
+      description: The situation you'd reach for it in.
+      placeholder: e.g. Building firewall allow-lists at work.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you use today?
+      description: Other sites or apps, and what's wrong with them.

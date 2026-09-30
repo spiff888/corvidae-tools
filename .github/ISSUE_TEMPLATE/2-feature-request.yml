@@ -1,0 +1,27 @@
+name: Improve an existing tool
+description: Add something to, or change, a tool that's already on the site.
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool?
+      options:
+        - Jackdaw (image conversion)
+        - Nutcracker (PDF)
+        - Chough (QR codes)
+        - Rook (subnet calculator)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
