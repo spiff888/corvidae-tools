@@ -45,7 +45,7 @@ export const tools = [
     name: "Steller's Jay",
     latin: 'Cyanocitta stelleri',
     description: 'PoE budget and UPS runtime calculators.',
-    status: 'beta'
+    status: 'beta',
     href: '/tools/stellersjay'
   },
   {
@@ -53,7 +53,7 @@ export const tools = [
     name: 'Blue Jay',
     latin: 'Cyanocitta cristata',
     description: 'DMX calculator: DIP switches, universes, Art-Net and sACN.',
-    status: 'beta'
+    status: 'beta',
     href: '/tools/bluejay'
   }
 ];
