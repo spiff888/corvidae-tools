@@ -6,7 +6,7 @@ export const tools = [
     name: 'Jackdaw',
     latin: 'Coloeus monedula',
     description: 'JPEG, PNG and WebP conversion, both directions. Runs entirely in your browser.',
-    status: 'beta',
+    status: 'live',
     href: '/tools/jackdaw'
   },
   {
@@ -14,7 +14,7 @@ export const tools = [
     name: 'Nutcracker',
     latin: 'Nucifraga columbiana',
     description: 'Merge, trim and reorder PDF pages, no upload required.',
-    status: 'beta',
+    status: 'live',
     href: '/tools/nutcracker'
   },
   {
@@ -22,7 +22,7 @@ export const tools = [
     name: 'Chough',
     latin: 'Pyrrhocorax pyrrhocorax',
     description: 'QR code generator, with logo overlay and export sizes.',
-    status: 'beta',
+    status: 'live',
     href: '/tools/chough'
   },
   // {
