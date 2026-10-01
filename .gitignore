@@ -20,4 +20,4 @@ npm-debug.log*
 # wrangler
 .wrangler
 .dev.vars*
-!.dev.vars.example
+!.dev.vars.example.astro/
