@@ -36,8 +36,9 @@ export const tools = [
     slug: 'rook',
     name: 'Rook',
     latin: 'Corvus frugilegus',
-    description: 'Subnet Calculator.',
+    description: 'IPv4 and IPv6 subnet calculator.',
     status: 'live',
+    badge: 'Updated',
     href: '/tools/rook'
   },
   {

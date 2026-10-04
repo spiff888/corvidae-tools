@@ -4,10 +4,11 @@ interface Props {
   latin: string;
   description: string;
   status: 'live' | 'beta' | 'planned';
+  badge?: string;
   href?: string;
 }
 
-const { name, latin, description, status, href } = Astro.props;
+const { name, latin, description, status, badge, href } = Astro.props;
 const badgeClass = status === 'planned' ? 'badge-planned' : status === 'beta' ? 'badge-beta' : 'badge-live';
 const Tag = href ? 'a' : 'div';
 ---
@@ -24,6 +25,7 @@ const Tag = href ? 'a' : 'div';
      <path d="M7 18a6 6 0 0 0 3.84-10.61" />
    </svg>
     {status !== 'live' && <span class={`badge ${badgeClass}`}>{status.toUpperCase()}</span>}
+    {status === 'live' && badge && <span class="badge badge-live">{badge.toUpperCase()}</span>}
   </div>
   <div>
     <div class="card-title" style={status === 'planned' ? 'color: #d4d4d9;' : undefined}>{name}</div>
