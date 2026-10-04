@@ -836,7 +836,10 @@ const universeRows = [
 
   function csvCell(v: string | number) {
     const s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    // Neutralise spreadsheet formulas: a text cell starting with = + - @ (or tab/CR)
+    // is evaluated by Excel/Sheets, so prefix it with an apostrophe.
+    const safe = typeof v === 'string' && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   }
 
   (document.getElementById('p-csv') as HTMLButtonElement).addEventListener('click', () => {
