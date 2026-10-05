@@ -80,7 +80,7 @@ public/
 - Everything happens in-memory in the browser tab; nothing is sent
   anywhere, and the file is discarded when the tab closes.
   
-  ## License
+## License
   
   Code: GPL-3.0-or-later. © 2026 Philip Gaw. See [LICENSE](LICENSE).
   
