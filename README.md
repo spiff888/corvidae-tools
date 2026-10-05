@@ -79,3 +79,9 @@ public/
   silently handing Safari users a mislabeled PNG.
 - Everything happens in-memory in the browser tab; nothing is sent
   anywhere, and the file is discarded when the tab closes.
+  
+  ## License
+  
+  Code: GPL-3.0-or-later. © 2026 Philip Gaw. See [LICENSE](LICENSE).
+  
+  Artwork: the bird marks, logo, and icons are not covered by the GPL. Please don't use the corvidae.tools name or bird marks in a way that suggests affiliation.
