@@ -8,7 +8,7 @@ export default defineConfig({
   integrations: [
     AstroPWA({
       registerType: 'autoUpdate',
-      injectRegister: false,
+      injectRegister: 'script',
       manifest: {
         name: 'corvidae.tools',
         short_name: 'corvidae',

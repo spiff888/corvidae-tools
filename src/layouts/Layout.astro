@@ -23,22 +23,7 @@ const { title, description = 'A small flock of browser-based tools. Nothing you 
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0d0d0f" />
-    <script is:inline>
-      // Register the service worker, and reload once when a newer version takes over,
-      // so a deploy shows up on the next visit instead of the one after.
-      if ('serviceWorker' in navigator) {
-        const hadController = !!navigator.serviceWorker.controller;
-        let reloading = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!hadController || reloading) return;
-          reloading = true;
-          location.reload();
-        });
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' });
-        });
-      }
-    </script>
+    <script is:inline src="/registerSW.js"></script>
 
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
