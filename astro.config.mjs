@@ -8,7 +8,7 @@ export default defineConfig({
   integrations: [
     AstroPWA({
       registerType: 'autoUpdate',
-      injectRegister: 'script',
+      injectRegister: false,
       manifest: {
         name: 'corvidae.tools',
         short_name: 'corvidae',
@@ -24,6 +24,9 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Activate a new service worker as soon as it installs, instead of waiting for every tab to close.
+        skipWaiting: true,
+        clientsClaim: true,
         // Pages, scripts and icons are cached up front, so every tool opens offline.
         // The large bird art is cached the first time each page is viewed instead.
         globPatterns: ['**/*.{html,js,css,svg,ico,webmanifest}', 'favicon-*.png', 'icon-*.png', 'apple-touch-icon.png'],
