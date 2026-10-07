@@ -33,7 +33,7 @@ export default defineConfig({
         navigateFallback: null,
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.endsWith('-mark.png'),
+            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.endsWith('-mark.webp'),
             handler: 'CacheFirst',
             options: { cacheName: 'bird-art', expiration: { maxEntries: 30 } }
           },
