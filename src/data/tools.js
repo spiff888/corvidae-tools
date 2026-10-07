@@ -46,7 +46,7 @@ export const tools = [
     name: "Steller's Jay",
     latin: 'Cyanocitta stelleri',
     description: 'PoE budget and UPS runtime calculators.',
-    status: 'beta',
+    status: 'live',
     href: '/tools/stellersjay'
   },
   {
