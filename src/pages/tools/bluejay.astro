@@ -18,7 +18,7 @@ const universeRows = [
 ];
 ---
 
-<Layout title="Blue Jay — DMX DIP switch & address calculator — corvidae.tools" description="Convert DMX addresses to DIP switch settings and back, and translate between universe, absolute, Art-Net and sACN addressing, entirely in your browser.">
+<Layout title="Blue Jay — DMX DIP switch & address calculator — corvidae.tools" description="Convert DMX addresses to DIP switch settings and back, and translate between universe, absolute, Art-Net and sACN addressing, patch a rig and estimate its power load, entirely in your browser.">
   <a href="/" class="back-link">&larr; corvidae.tools</a>
 
   <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
@@ -27,7 +27,7 @@ const universeRows = [
         <h1 style="font-size: 32px; margin: 0;">Blue Jay</h1>
         <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Cyanocitta cristata</span>
       </div>
-      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Set a fixture's DIP switches from a DMX address (or read the address off the switches), translate universes between console, Art-Net and sACN numbering, and patch a whole rig.</p>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Set a fixture's DIP switches from a DMX address (or read the address off the switches), translate universes between console, Art-Net and sACN numbering, patch a whole rig, and estimate its power load.</p>
     </div>
     <img src="/blue-jay-mark.webp" alt="" width="220" height="239" style="width: 220px; height: auto; flex-shrink: 0;" />
   </div>
@@ -35,6 +35,7 @@ const universeRows = [
   <div class="tabs" role="tablist" aria-label="Blue Jay tools">
     <button type="button" class="tab" role="tab" id="tab-addressing" aria-controls="panel-addressing" aria-selected="true">Addressing</button>
     <button type="button" class="tab" role="tab" id="tab-patch" aria-controls="panel-patch" aria-selected="false">Patch planner</button>
+    <button type="button" class="tab" role="tab" id="tab-power" aria-controls="panel-power" aria-selected="false">Power</button>
   </div>
 
   <div id="panel-addressing" role="tabpanel" aria-labelledby="tab-addressing">
@@ -144,10 +145,10 @@ const universeRows = [
       </div>
 
       <div class="fixture-head" aria-hidden="true">
-        <span>Fixture</span><span>Channels</span><span>Qty</span><span></span>
+        <span>Fixture</span><span>Channels</span><span>Watts</span><span>Qty</span><span></span>
       </div>
       <div id="fixture-list"></div>
-      <p class="hint" style="margin: 12px 0 0;">Channels is the fixture's DMX mode (for example 7CH or 36CH), shown in its menu or manual, not the number of lamps.</p>
+      <p class="hint" style="margin: 12px 0 0;">Channels is the fixture's DMX mode (for example 7CH or 36CH), shown in its menu or manual, not the number of lamps. Watts is what one fixture draws, from its label or spec sheet; it feeds the Power tab and isn't used for addressing.</p>
 
       <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 32px;">
         <button type="button" id="p-add" class="btn-primary">Add fixture</button>
@@ -169,6 +170,73 @@ const universeRows = [
         </div>
       </div>
       <p class="hint" style="margin-top: 12px;">The DIP column follows the fixture convention set on the Addressing tab.</p>
+    </section>
+  </div>
+
+  <div id="panel-power" role="tabpanel" aria-labelledby="tab-power" hidden>
+    <section class="section">
+      <h2>Power estimate</h2>
+      <p class="hint">Uses the fixture list from the Patch planner, so enter each fixture&rsquo;s Watts there. Fixtures are packed onto circuits one by one, because a fixture can&rsquo;t be split across two breakers.</p>
+      <p class="notice"><strong>Estimate only.</strong> This is not a code-compliance check. Have a qualified electrician verify circuits, wire sizes, breakers and neutral loading before anything is energized.</p>
+
+      <div class="row">
+        <div>
+          <label for="w-phase">Supply</label>
+          <select id="w-phase" class="field">
+            <option value="1" selected>120 V single-phase</option>
+            <option value="3">208 V 3-phase (120/208 V wye)</option>
+          </select>
+        </div>
+        <div>
+          <label for="w-breaker">Circuit breaker</label>
+          <select id="w-breaker" class="field">
+            <option value="15">15 A</option>
+            <option value="20" selected>20 A</option>
+            <option value="30">30 A</option>
+          </select>
+        </div>
+        <div>
+          <label for="w-pf">Power factor</label>
+          <input type="number" id="w-pf" class="field" min="0.5" max="1" step="0.01" value="0.9" style="width: 120px;" />
+        </div>
+      </div>
+      <p class="hint">Circuits are loaded to 80% of the breaker rating (the continuous-load rule), and this can&rsquo;t be changed. Power factor turns watts into volt-amps, which is what the breaker actually sees. Use 1.0 for incandescent or tungsten; LED drivers are often 0.9&ndash;0.95, so check the spec sheet. If your fixture figures are already in VA, a lower power factor only adds safety margin. Everything is on 120 V circuits; 208 V fixtures aren&rsquo;t modelled.</p>
+
+      <p id="w-empty" class="summary" style="display: none;">Enter Watts for at least one fixture in the Patch planner to see the power estimate.</p>
+      <p id="w-warning" class="warning" style="display: none;"></p>
+
+      <div id="w-output">
+        <div class="results" style="margin-top: 20px;">
+          <table>
+            <tbody id="w-totals"></tbody>
+          </table>
+        </div>
+
+        <div id="w-phase-box" class="results patch-results" style="margin-top: 20px; max-width: 640px;">
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr><th>Phase</th><th>Circuits</th><th>Watts</th><th>VA</th><th>Line current</th></tr>
+              </thead>
+              <tbody id="w-phase-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <p id="w-balance" class="summary" style="display: none;"></p>
+        <p id="w-three-note" class="warning" style="display: none;">Neutral current here is the fundamental only. LED and other switch-mode supplies add third-harmonic current that stacks up in the neutral, so the real neutral current can be as high as the phase current, or higher. Don&rsquo;t size the neutral from this number.</p>
+
+        <div class="results patch-results" style="margin-top: 20px;">
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr><th>Circuit</th><th>Load</th><th>Current</th><th>Of usable</th><th>On this circuit</th></tr>
+              </thead>
+              <tbody id="w-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="hint" style="margin-top: 12px;">The circuit count assumes 120 V single-pole circuits, filled largest fixture first. Inrush current when many fixtures switch on together isn&rsquo;t modelled, and some LED supplies can trip a breaker at power-up. Treat the circuit count as a minimum.</p>
+      </div>
     </section>
   </div>
 
@@ -380,10 +448,10 @@ const universeRows = [
   .fixture-head,
   #fixture-list :global(.fixture-row) {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) 110px 90px 40px;
+    grid-template-columns: minmax(140px, 1fr) 110px 100px 90px 40px;
     gap: 12px;
     align-items: center;
-    max-width: 640px;
+    max-width: 760px;
   }
   .fixture-head {
     font-family: var(--font-mono);
@@ -450,35 +518,109 @@ const universeRows = [
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  #p-body :global(tr) {
+  #p-body :global(tr),
+  #w-body :global(tr),
+  #w-phase-body :global(tr) {
     border-bottom: 1px solid var(--border);
   }
-  #p-body :global(tr:last-child) {
+  #p-body :global(tr:last-child),
+  #w-body :global(tr:last-child),
+  #w-phase-body :global(tr:last-child) {
     border-bottom: none;
   }
-  #p-body :global(td) {
+  #p-body :global(td),
+  #w-body :global(td),
+  #w-phase-body :global(td) {
     padding: 10px 20px;
     text-align: left;
     font-weight: 400;
     color: var(--text-muted);
     white-space: nowrap;
   }
-  #p-body :global(td:first-child) {
+  #p-body :global(td:first-child),
+  #w-body :global(td:first-child),
+  #w-phase-body :global(td:first-child) {
     color: var(--text);
   }
-  #p-body :global(td.addr) {
+  #p-body :global(td.addr),
+  #w-body :global(td.addr),
+  #w-phase-body :global(td.addr) {
     color: var(--text);
     font-weight: 700;
   }
-  #p-body :global(tr.universe-start td) {
+  #p-body :global(tr.universe-start td),
+  #w-body :global(tr.universe-start td),
+  #w-phase-body :global(tr.universe-start td) {
     border-top: 1px solid var(--text-faint);
   }
 
+  #w-totals :global(tr) {
+    border-bottom: 1px solid var(--border);
+  }
+  #w-totals :global(tr:last-child) {
+    border-bottom: none;
+  }
+  #w-totals :global(td) {
+    padding: 14px 20px;
+  }
+  #w-totals :global(td:first-child) {
+    color: var(--text-faint);
+  }
+  #w-totals :global(td:last-child) {
+    color: var(--text);
+    text-align: right;
+    font-weight: 700;
+  }
+  .notice {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    max-width: 640px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    border: 1px solid #e0b374;
+    border-radius: 8px;
+  }
+  #w-body :global(td.over) {
+    color: #e0b374;
+    font-weight: 700;
+  }
+  #w-body :global(td.contents) {
+    white-space: normal;
+    min-width: 200px;
+  }
+  #fixture-list :global(.num-label) {
+    display: block;
+    margin: 0;
+  }
+  #fixture-list :global(.num-label span) {
+    display: none;
+  }
+
   @media (max-width: 560px) {
-    .fixture-head,
+    /* two rows per fixture: name + remove, then channels / watts / qty with small labels */
+    .fixture-head {
+      display: none;
+    }
     #fixture-list :global(.fixture-row) {
-      grid-template-columns: minmax(0, 1fr) 72px 60px 40px;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) 40px;
       gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    #fixture-list :global(.fixture-row > :nth-child(1)) {
+      grid-column: 1 / 4;
+    }
+    #fixture-list :global(.fixture-row > :nth-child(5)) {
+      grid-column: 4;
+      grid-row: 1;
+    }
+    #fixture-list :global(.num-label span) {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-bottom: 4px;
     }
   }
 
@@ -632,7 +774,8 @@ const universeRows = [
   // ---------- Tabs ----------
   const tabs = [
     { btn: document.getElementById('tab-addressing') as HTMLButtonElement, panel: document.getElementById('panel-addressing') as HTMLDivElement, hash: '' },
-    { btn: document.getElementById('tab-patch') as HTMLButtonElement, panel: document.getElementById('panel-patch') as HTMLDivElement, hash: '#patch' }
+    { btn: document.getElementById('tab-patch') as HTMLButtonElement, panel: document.getElementById('panel-patch') as HTMLDivElement, hash: '#patch' },
+    { btn: document.getElementById('tab-power') as HTMLButtonElement, panel: document.getElementById('panel-power') as HTMLDivElement, hash: '#power' }
   ];
 
   function showTab(index: number, updateHash = true) {
@@ -644,16 +787,16 @@ const universeRows = [
   }
 
   tabs.forEach((t, i) => t.btn.addEventListener('click', () => showTab(i)));
-  showTab(location.hash === '#patch' ? 1 : 0, false);
+  showTab(location.hash === '#patch' ? 1 : location.hash === '#power' ? 2 : 0, false);
 
   // ---------- Patch planner ----------
-  type Fixture = { name: string; channels: number; qty: number };
+  type Fixture = { name: string; channels: number; qty: number; watts: number };
 
   const STORAGE_KEY = 'bluejay-patch-v1';
   const EXAMPLE: Fixture[] = [
-    { name: 'Moving head', channels: 16, qty: 8 },
-    { name: 'LED par', channels: 7, qty: 24 },
-    { name: 'LED batten', channels: 36, qty: 7 }
+    { name: 'Moving head', channels: 16, qty: 8, watts: 350 },
+    { name: 'LED par', channels: 7, qty: 24, watts: 80 },
+    { name: 'LED batten', channels: 36, qty: 7, watts: 120 }
   ];
 
   const fixtureList = document.getElementById('fixture-list') as HTMLDivElement;
@@ -664,6 +807,11 @@ const universeRows = [
   const pWarning = document.getElementById('p-warning') as HTMLParagraphElement;
   const pOutput = document.getElementById('p-output') as HTMLDivElement;
   const pBody = document.getElementById('p-body') as HTMLTableSectionElement;
+
+  // power tab controls (read by loadFixtures, so declared first)
+  const wPhase = document.getElementById('w-phase') as HTMLSelectElement;
+  const wBreaker = document.getElementById('w-breaker') as HTMLSelectElement;
+  const wPf = document.getElementById('w-pf') as HTMLInputElement;
 
   let fixtures: Fixture[] = loadFixtures();
 
@@ -676,7 +824,19 @@ const universeRows = [
           pStartU.value = String(parsed.startUniverse ?? 1);
           pStartA.value = String(parsed.startAddress ?? 1);
           pSplit.value = parsed.split === 'yes' ? 'yes' : 'no';
-          return parsed.fixtures;
+          const p = parsed.power;
+          if (p && typeof p === 'object') {
+            if (p.phase === '1' || p.phase === '3') wPhase.value = p.phase;
+            if (['15', '20', '30'].includes(String(p.breaker))) wBreaker.value = String(p.breaker);
+            if (Number(p.pf) >= 0.5 && Number(p.pf) <= 1) wPf.value = String(p.pf);
+          }
+          // saved lists from before the Power tab have no watts; treat them as not entered yet
+          return parsed.fixtures.map((f: Partial<Fixture>) => ({
+            name: typeof f.name === 'string' ? f.name : '',
+            channels: Number(f.channels),
+            qty: Number(f.qty),
+            watts: Number(f.watts) > 0 ? Number(f.watts) : 0
+          }));
         }
       }
     } catch {
@@ -689,28 +849,45 @@ const universeRows = [
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ fixtures, startUniverse: pStartU.value, startAddress: pStartA.value, split: pSplit.value })
+        JSON.stringify({
+          fixtures,
+          startUniverse: pStartU.value,
+          startAddress: pStartA.value,
+          split: pSplit.value,
+          power: { phase: wPhase.value, breaker: wBreaker.value, pf: wPf.value }
+        })
       );
     } catch {
       /* private browsing or storage full: the planner still works, it just won't persist */
     }
   }
 
-  function makeInput(type: string, value: string, label: string, onInput: (v: string) => void) {
+  type NumberRange = { min: string; max: string; step?: string; short: string };
+
+  function makeInput(type: string, value: string, label: string, onInput: (v: string) => void, range?: NumberRange) {
     const input = document.createElement('input');
     input.type = type;
     input.className = 'field';
     input.value = value;
     input.setAttribute('aria-label', label);
     if (type === 'number') {
-      input.min = '1';
-      input.max = '512';
+      input.min = range?.min ?? '1';
+      input.max = range?.max ?? '512';
+      if (range?.step) input.step = range.step;
     } else {
       input.autocomplete = 'off';
       input.spellcheck = false;
     }
     input.addEventListener('input', () => onInput(input.value));
-    return input;
+    if (type !== 'number' || !range) return input;
+    // number fields get a small label that only shows on phones, where the column headers are hidden
+    const wrap = document.createElement('label');
+    wrap.className = 'num-label';
+    const cap = document.createElement('span');
+    cap.textContent = range.short;
+    cap.setAttribute('aria-hidden', 'true');
+    wrap.append(cap, input);
+    return wrap;
   }
 
   function renderFixtureRows() {
@@ -721,8 +898,9 @@ const universeRows = [
       const n = i + 1;
       row.append(
         makeInput('text', f.name, `Fixture ${n} name`, (v) => { f.name = v; recalc(); }),
-        makeInput('number', String(f.channels), `Fixture ${n} channels`, (v) => { f.channels = Math.floor(Number(v)); recalc(); }),
-        makeInput('number', String(f.qty), `Fixture ${n} quantity`, (v) => { f.qty = Math.floor(Number(v)); recalc(); })
+        makeInput('number', String(f.channels), `Fixture ${n} channels`, (v) => { f.channels = Math.floor(Number(v)); recalc(); }, { min: '1', max: '512', short: 'Channels' }),
+        makeInput('number', f.watts > 0 ? String(f.watts) : '', `Fixture ${n} watts each`, (v) => { f.watts = Number(v) > 0 ? Number(v) : 0; recalc(); }, { min: '0', max: '50000', step: 'any', short: 'Watts' }),
+        makeInput('number', String(f.qty), `Fixture ${n} quantity`, (v) => { f.qty = Math.floor(Number(v)); recalc(); }, { min: '1', max: '2000', short: 'Qty' })
       );
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -739,7 +917,7 @@ const universeRows = [
     });
   }
 
-  type Patched = { label: string; universe: number; address: number; end: number; endUniverse: number; channels: number };
+  type Patched = { label: string; universe: number; address: number; end: number; endUniverse: number; channels: number; watts: number };
 
   function dipOn(address: number): string {
     const total = address - offset();
@@ -788,7 +966,7 @@ const universeRows = [
         const absEnd = (universe - 1) * 512 + address + ch - 1;
         const endU = Math.floor((absEnd - 1) / 512) + 1;
         const endA = ((absEnd - 1) % 512) + 1;
-        out.push({ label: qty > 1 ? `${name} ${n}` : name, universe: startU, address: startA, end: endA, endUniverse: endU, channels: ch });
+        out.push({ label: qty > 1 ? `${name} ${n}` : name, universe: startU, address: startA, end: endA, endUniverse: endU, channels: ch, watts: f.watts });
         used += ch;
         universe = endA === 512 ? endU + 1 : endU;
         address = endA === 512 ? 1 : endA + 1;
@@ -832,6 +1010,7 @@ const universeRows = [
     }
     pWarning.textContent = warnings.join(' ');
     pWarning.style.display = warnings.length ? 'block' : 'none';
+    recalcPower();
   }
 
   function csvCell(v: string | number) {
@@ -842,12 +1021,187 @@ const universeRows = [
     return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   }
 
+
+  // ---------- Power ----------
+  const wOutput = document.getElementById('w-output') as HTMLDivElement;
+  const wEmpty = document.getElementById('w-empty') as HTMLParagraphElement;
+  const wWarning = document.getElementById('w-warning') as HTMLParagraphElement;
+  const wTotals = document.getElementById('w-totals') as HTMLTableSectionElement;
+  const wPhaseBox = document.getElementById('w-phase-box') as HTMLDivElement;
+  const wPhaseBody = document.getElementById('w-phase-body') as HTMLTableSectionElement;
+  const wBalance = document.getElementById('w-balance') as HTMLParagraphElement;
+  const wThreeNote = document.getElementById('w-three-note') as HTMLParagraphElement;
+  const wBody = document.getElementById('w-body') as HTMLTableSectionElement;
+
+  const LEG_VOLTS = 120; // every circuit is 120 V single-pole
+  const LINE_VOLTS = 208; // 120/208 V wye
+  const USABLE_FRACTION = 0.8; // continuous-load rule; deliberately not adjustable
+  const MAX_UNITS = 5000;
+
+  const fmt = (n: number, digits = 0) => n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+  type Circuit = { va: number; w: number; counts: Map<string, number>; phase: number };
+
+  function addRow(body: HTMLTableSectionElement, cells: [string, string?][]) {
+    const tr = document.createElement('tr');
+    for (const [text, cls] of cells) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      if (cls) td.className = cls;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+
+  function recalcPower() {
+    const threePhase = wPhase.value === '3';
+    const breaker = ['15', '20', '30'].includes(wBreaker.value) ? Number(wBreaker.value) : 20;
+    const warnings: string[] = [];
+    let pf = Number(wPf.value);
+    if (!(pf >= 0.5 && pf <= 1)) {
+      warnings.push('Power factor must be between 0.5 and 1.0, so 0.9 is being used.');
+      pf = 0.9;
+    }
+    const capVA = LEG_VOLTS * breaker * USABLE_FRACTION;
+
+    // one entry per physical fixture
+    const units: { name: string; w: number; va: number }[] = [];
+    const noWatts: string[] = [];
+    let capped = false;
+    for (const f of fixtures) {
+      const name = f.name.trim() || 'Fixture';
+      if (!Number.isInteger(f.qty) || f.qty < 1) continue; // the patch planner already flags this
+      if (!(f.watts > 0)) {
+        noWatts.push(name);
+        continue;
+      }
+      for (let n = 0; n < f.qty; n++) {
+        if (units.length >= MAX_UNITS) {
+          capped = true;
+          break;
+        }
+        units.push({ name, w: f.watts, va: f.watts / pf });
+      }
+    }
+    if (noWatts.length) {
+      const one = noWatts.length === 1;
+      warnings.push(`No wattage entered for ${noWatts.join(', ')}, so ${one ? 'it isn\u2019t' : 'they aren\u2019t'} counted${units.length ? `. The totals below are too low until you add ${one ? 'it' : 'them'}.` : '.'}`);
+    }
+    if (capped) warnings.push(`Only the first ${MAX_UNITS.toLocaleString()} fixtures are counted.`);
+
+    wWarning.style.display = 'none';
+    wBody.innerHTML = '';
+    wTotals.innerHTML = '';
+    wPhaseBody.innerHTML = '';
+
+    if (!units.length) {
+      wOutput.style.display = 'none';
+      wEmpty.style.display = 'block';
+      if (warnings.length) {
+        wWarning.textContent = warnings.join(' ');
+        wWarning.style.display = 'block';
+      }
+      return;
+    }
+    wEmpty.style.display = 'none';
+    wOutput.style.display = 'block';
+
+    // first-fit decreasing: biggest fixtures first, each onto the first circuit with room
+    units.sort((a, b) => b.va - a.va);
+    const circuits: Circuit[] = [];
+    let oversize = 0;
+    for (const u of units) {
+      let c: Circuit | undefined;
+      if (u.va <= capVA) c = circuits.find((x) => x.va + u.va <= capVA + 1e-9);
+      else oversize++;
+      if (!c) {
+        c = { va: 0, w: 0, counts: new Map(), phase: 0 };
+        circuits.push(c);
+      }
+      c.va += u.va;
+      c.w += u.w;
+      c.counts.set(u.name, (c.counts.get(u.name) ?? 0) + 1);
+    }
+    if (oversize) {
+      warnings.push(`${oversize} fixture${oversize === 1 ? '' : 's'} draw${oversize === 1 ? 's' : ''} more than one ${breaker} A circuit can carry (${fmt(capVA)} VA usable). Each sits alone on an overloaded circuit below; use a bigger circuit or a different supply for ${oversize === 1 ? 'it' : 'them'}.`);
+    }
+
+    const totalW = units.reduce((s, u) => s + u.w, 0);
+    const totalVA = units.reduce((s, u) => s + u.va, 0);
+
+    // 3-phase: give each circuit, largest first, to whichever phase is lightest so far
+    const phaseVA = [0, 0, 0];
+    const phaseW = [0, 0, 0];
+    const phaseCount = [0, 0, 0];
+    if (threePhase) {
+      for (const c of [...circuits].sort((a, b) => b.va - a.va)) {
+        const lightest = phaseVA.indexOf(Math.min(...phaseVA));
+        c.phase = lightest;
+        phaseVA[lightest] += c.va;
+        phaseW[lightest] += c.w;
+        phaseCount[lightest]++;
+      }
+      circuits.sort((a, b) => a.phase - b.phase || b.va - a.va);
+    }
+
+    addRow(wTotals, [['Real power', ''], [`${fmt(totalW)} W`]]);
+    addRow(wTotals, [[`Apparent power (at PF ${pf})`], [`${fmt(totalVA)} VA`]]);
+    if (threePhase) {
+      addRow(wTotals, [['Line current if perfectly balanced (208 V)'], [`${fmt(totalVA / (Math.sqrt(3) * LINE_VOLTS), 1)} A`]]);
+      const [a, b, c] = phaseVA.map((v) => v / LEG_VOLTS);
+      const neutral = Math.sqrt(Math.max(0, a * a + b * b + c * c - a * b - b * c - c * a));
+      addRow(wTotals, [['Neutral current (fundamental only)'], [`${fmt(neutral, 1)} A`]]);
+    } else {
+      addRow(wTotals, [['Current at 120 V'], [`${fmt(totalVA / LEG_VOLTS, 1)} A`]]);
+    }
+    addRow(wTotals, [[`Circuits needed (${breaker} A breakers)`], [String(circuits.length)]]);
+    addRow(wTotals, [['Usable per circuit (80%)'], [`${fmt(breaker * USABLE_FRACTION, 1)} A / ${fmt(capVA)} VA`]]);
+
+    wPhaseBox.style.display = threePhase ? 'block' : 'none';
+    wThreeNote.style.display = threePhase ? 'block' : 'none';
+    wBalance.style.display = threePhase ? 'block' : 'none';
+    if (threePhase) {
+      ['L1', 'L2', 'L3'].forEach((name, i) => {
+        addRow(wPhaseBody, [[name, 'addr'], [String(phaseCount[i])], [fmt(phaseW[i])], [fmt(phaseVA[i])], [`${fmt(phaseVA[i] / LEG_VOLTS, 1)} A`]]);
+      });
+      const avg = totalVA / 3;
+      const worst = Math.max(...phaseVA);
+      const pct = avg > 0 ? ((worst - avg) / avg) * 100 : 0;
+      wBalance.textContent = `Circuits are spread across L1, L2 and L3, heaviest first. The busiest phase is ${fmt(pct)}% above the average.`;
+    }
+
+    const perPhase = [0, 0, 0];
+    for (const c of circuits) {
+      const idx = threePhase ? ++perPhase[c.phase] : perPhase[0] + 1;
+      if (!threePhase) perPhase[0]++;
+      const label = threePhase ? `L${c.phase + 1}-${idx}` : String(idx);
+      const percent = (c.va / capVA) * 100;
+      const over = c.va > capVA + 1e-9;
+      const contents = [...c.counts].map(([n, k]) => (k > 1 ? `${n} \u00d7${k}` : n)).join(', ');
+      addRow(wBody, [
+        [label, 'addr'],
+        [`${fmt(c.w)} W / ${fmt(c.va)} VA`],
+        [`${fmt(c.va / LEG_VOLTS, 1)} A`],
+        [over ? `${fmt(percent, 1)}% OVER` : `${fmt(percent, 1)}%`, over ? 'over' : undefined],
+        [contents, 'contents']
+      ]);
+    }
+
+    if (warnings.length) {
+      wWarning.textContent = warnings.join(' ');
+      wWarning.style.display = 'block';
+    }
+  }
+
+  [wPhase, wBreaker].forEach((el) => el.addEventListener('change', () => { saveFixtures(); recalcPower(); }));
+  wPf.addEventListener('input', () => { saveFixtures(); recalcPower(); });
+
   (document.getElementById('p-csv') as HTMLButtonElement).addEventListener('click', () => {
-    const header = ['Fixture', 'Universe', 'Start address', 'End universe', 'End address', 'Channels', 'Console', 'Absolute start', 'DIP switches on'];
+    const header = ['Fixture', 'Universe', 'Start address', 'End universe', 'End address', 'Channels', 'Console', 'Absolute start', 'DIP switches on', 'Watts each'];
     const lines = [header.join(',')];
     for (const p of lastPatch) {
       lines.push(
-        [p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address)]
+        [p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address), p.watts > 0 ? p.watts : '']
           .map(csvCell)
           .join(',')
       );
@@ -862,7 +1216,7 @@ const universeRows = [
   });
 
   (document.getElementById('p-add') as HTMLButtonElement).addEventListener('click', () => {
-    fixtures.push({ name: '', channels: 1, qty: 1 });
+    fixtures.push({ name: '', channels: 1, qty: 1, watts: 0 });
     renderFixtureRows();
     recalc();
     const inputs = fixtureList.querySelectorAll<HTMLInputElement>('.fixture-row:last-child input');
