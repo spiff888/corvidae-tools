@@ -7,6 +7,7 @@ export const tools = [
     latin: 'Coloeus monedula',
     description: 'JPEG, PNG and WebP conversion, plus iPhone HEIC photos, in batches. Runs entirely in your browser.',
     status: 'live',
+    badge: 'Updated',
     href: '/tools/jackdaw'
   },
   {
