@@ -62,7 +62,7 @@ a:hover {
 }
 
 .mascot {
-  height: 200px;
+  height: auto;
   width: auto;
   flex-shrink: 0;
 }
