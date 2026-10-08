@@ -30,12 +30,19 @@ export default defineConfig({
         // Pages, scripts and icons are cached up front, so every tool opens offline.
         // The large bird art is cached the first time each page is viewed instead.
         globPatterns: ['**/*.{html,js,css,svg,ico,webmanifest}', 'favicon-*.png', 'icon-*.png', 'apple-touch-icon.png'],
+        // The HEIC decoder (about 1.5 MB) is only downloaded when someone converts a HEIC photo, then cached below.
+        globIgnores: ['vendor/**'],
         navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.endsWith('-mark.webp'),
             handler: 'CacheFirst',
             options: { cacheName: 'bird-art', expiration: { maxEntries: 30 } }
+          },
+          {
+            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/vendor/libheif/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'heic-decoder', expiration: { maxEntries: 6 } }
           },
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,

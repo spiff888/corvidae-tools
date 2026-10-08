@@ -5,7 +5,7 @@ export const tools = [
     slug: 'jackdaw',
     name: 'Jackdaw',
     latin: 'Coloeus monedula',
-    description: 'JPEG, PNG and WebP conversion, both directions. Runs entirely in your browser.',
+    description: 'JPEG, PNG and WebP conversion, plus iPhone HEIC photos, in batches. Runs entirely in your browser.',
     status: 'live',
     href: '/tools/jackdaw'
   },

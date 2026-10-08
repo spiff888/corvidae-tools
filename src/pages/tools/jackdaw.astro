@@ -3,7 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import Footer from '../../components/Footer.astro';
 ---
 
-<Layout title="Jackdaw — image converter — corvidae.tools" description="Convert images between JPEG, PNG and WebP entirely in your browser. Nothing is uploaded.">
+<Layout title="Jackdaw — image converter — corvidae.tools" description="Convert images between JPEG, PNG and WebP, and open iPhone HEIC photos, several files at a time, entirely in your browser. Nothing is uploaded.">
   <a href="/" class="back-link">&larr; corvidae.tools</a>
 
   <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
@@ -12,7 +12,7 @@ import Footer from '../../components/Footer.astro';
         <h1 style="font-size: 32px; margin: 0;">Jackdaw</h1>
         <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Coloeus monedula</span>
       </div>
-      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Convert images between JPEG, PNG and WebP. Everything happens on your device &mdash; the file never leaves your browser.</p>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Convert images between JPEG, PNG and WebP, including iPhone HEIC photos, several at a time. Everything happens on your device &mdash; the files never leave your browser.</p>
     </div>
     <img src="/jackdaw-mark.webp" alt="" width="220" height="239" style="width: 220px; height: auto; flex-shrink: 0;" />
   </div>
@@ -21,10 +21,10 @@ import Footer from '../../components/Footer.astro';
     Your browser doesn't support encoding to WebP &mdash; you can still convert <em>from</em> WebP, but converting <em>to</em> WebP will fall back to PNG. Chrome and Firefox support WebP output fully.
   </div>
 
-  <div id="dropzone" style="border: 2px dashed var(--border); border-radius: 16px; padding: 48px 32px; text-align: center; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; margin-bottom: 32px;">
-    <p style="margin: 0 0 8px; font-size: 16px; color: var(--text-muted);">Drop an image here, or click to choose one</p>
-    <p style="margin: 0; font-size: 13px; color: var(--text-faint); font-family: var(--font-mono);">JPEG, PNG or WebP &middot; converted images are cropped to nothing, kept to nothing &mdash; they just live in this tab</p>
-    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" style="display: none;" />
+  <div id="dropzone" role="button" tabindex="0" aria-label="Choose images to convert" style="border: 2px dashed var(--border); border-radius: 16px; padding: 48px 32px; text-align: center; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; margin-bottom: 32px;">
+    <p style="margin: 0 0 8px; font-size: 16px; color: var(--text-muted);">Drop images here, or click to choose them</p>
+    <p style="margin: 0; font-size: 13px; color: var(--text-faint); font-family: var(--font-mono);">JPEG, PNG, WebP or HEIC &middot; up to 50 files at a time &middot; nothing is uploaded, files only live in this tab</p>
+    <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" style="display: none;" />
   </div>
 
   <div id="controls" style="display: none; flex-direction: column; gap: 24px;">
@@ -45,20 +45,151 @@ import Footer from '../../components/Footer.astro';
       </div>
     </div>
 
-    <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
-      <div id="preview-wrap" style="border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg-card); width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-        <img id="preview-img" style="max-width: 100%; max-height: 100%; display: block;" />
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 8px; font-family: var(--font-mono); font-size: 14px;">
-        <div id="original-info" style="color: var(--text-muted);"></div>
-        <div id="result-info" style="color: var(--accent); display: none;"></div>
-        <a id="download-link" href="#" download style="display: none; margin-top: 8px; background: var(--accent); color: #0d0d0f; padding: 10px 18px; border-radius: 8px; font-weight: 700; text-decoration: none; width: fit-content;">Download</a>
-      </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+      <p id="summary" role="status" style="margin: 0; font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); flex: 1; min-width: 220px;"></p>
+      <button type="button" id="zip-btn" class="jd-primary" style="display: none;">Download all (.zip)</button>
+      <button type="button" id="clear-btn" class="jd-secondary">Clear all</button>
     </div>
+    <p id="notice" class="jd-notice" style="display: none;"></p>
+
+    <ul id="file-list" class="jd-list"></ul>
+    <p style="margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-faint); max-width: 640px;">
+      Photos are converted as flat sRGB pixels, so metadata such as location and camera details is dropped. HEIC files are decoded with <a href="https://github.com/strukturag/libheif" target="_blank" rel="noopener">libheif</a> (LGPL-3.0), which downloads once, only when a HEIC file needs it.
+    </p>
   </div>
 
   <Footer />
 </Layout>
+
+<style is:global>
+  .jd-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .jd-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto auto;
+    gap: 12px;
+    align-items: center;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .jd-thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background: #0d0d0f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .jd-thumb canvas {
+    width: 56px;
+    height: 56px;
+    display: block;
+  }
+  .jd-name {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .jd-info {
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .jd-info.jd-result {
+    color: var(--accent);
+  }
+  .jd-info.jd-error {
+    color: #e0b374;
+    white-space: normal;
+  }
+  .jd-actions {
+    display: contents;
+  }
+  .jd-primary,
+  .jd-dl {
+    background: var(--accent);
+    border: none;
+    color: #0d0d0f;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .jd-primary:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+  .jd-secondary,
+  .jd-x {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .jd-x {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .jd-x:hover,
+  .jd-secondary:hover {
+    color: var(--text);
+    border-color: var(--text-faint);
+  }
+  .jd-primary:focus-visible,
+  .jd-dl:focus-visible,
+  .jd-secondary:focus-visible,
+  .jd-x:focus-visible,
+  #dropzone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .jd-notice {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: #e0b374;
+    max-width: 640px;
+  }
+  @media (max-width: 560px) {
+    .jd-row {
+      grid-template-columns: 56px minmax(0, 1fr);
+    }
+    .jd-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+  }
+</style>
 
 <script>
   const dropzone = document.getElementById('dropzone') as HTMLDivElement;
@@ -68,15 +199,52 @@ import Footer from '../../components/Footer.astro';
   const qualityRow = document.getElementById('quality-row') as HTMLDivElement;
   const qualityRange = document.getElementById('quality-range') as HTMLInputElement;
   const qualityValue = document.getElementById('quality-value') as HTMLSpanElement;
-  const previewImg = document.getElementById('preview-img') as HTMLImageElement;
-  const originalInfo = document.getElementById('original-info') as HTMLDivElement;
-  const resultInfo = document.getElementById('result-info') as HTMLDivElement;
-  const downloadLink = document.getElementById('download-link') as HTMLAnchorElement;
+  const summary = document.getElementById('summary') as HTMLParagraphElement;
+  const zipBtn = document.getElementById('zip-btn') as HTMLButtonElement;
+  const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement;
+  const notice = document.getElementById('notice') as HTMLParagraphElement;
+  const fileList = document.getElementById('file-list') as HTMLUListElement;
   const safariWarning = document.getElementById('safari-warning') as HTMLDivElement;
 
-  let currentFile: File | null = null;
-  let currentImage: HTMLImageElement | null = null;
+  const MAX_FILES = 50;
+  const MAX_FILE_BYTES = 200 * 1024 * 1024;
+  const MAX_PIXELS = 120_000_000; // refuse images this large: the canvas would run the browser out of memory
+  const CACHE_PIXELS = 60_000_000; // keep decoded pictures in memory up to this many pixels in total, re-decode beyond it
+  const LIBHEIF_JS = '/vendor/libheif/libheif.js';
+  const LIBHEIF_WASM = '/vendor/libheif/libheif.wasm';
 
+  type Source = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
+  type Result = { blob: Blob; type: string; name: string; url: string };
+  type Item = {
+    id: number;
+    file: File;
+    kind: 'native' | 'heic';
+    state: 'queued' | 'working' | 'done' | 'error';
+    error: string;
+    width: number;
+    height: number;
+    source: Source | null;
+    sourceUrl: string | null;
+    cachedPixels: number;
+    thumbDrawn: boolean;
+    result: Result | null;
+    removed: boolean;
+    row: HTMLLIElement;
+    thumb: HTMLDivElement;
+    info: HTMLDivElement;
+    actions: HTMLDivElement;
+  };
+
+  const items: Item[] = [];
+  let nextId = 1;
+  let settingsGen = 0;
+  let pumping = false;
+  let cachedTotal = 0;
+
+  // Errors whose message is safe and useful to show on the page; anything else gets a generic line.
+  class UserError extends Error {}
+
+  // ---------- helpers ----------
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -87,6 +255,25 @@ import Footer from '../../components/Footer.astro';
     if (mime === 'image/webp') return 'webp';
     if (mime === 'image/jpeg') return 'jpg';
     return 'png';
+  }
+
+  function label(mime: string): string {
+    return mime.replace('image/', '').replace('jpeg', 'jpg').toUpperCase();
+  }
+
+  // File names come from the visitor's disk: keep letters, digits and common punctuation only.
+  function safeStem(name: string): string {
+    const stem = name
+      .replace(/\.[^.]*$/, '')
+      .replace(/[\u0000-\u001f\u007f\\/:*?"<>|%]/g, '_')
+      .replace(/^[.\s]+|[.\s]+$/g, '')
+      .slice(0, 100);
+    return stem || 'image';
+  }
+
+  function showNotice(text: string) {
+    notice.textContent = text;
+    notice.style.display = text ? 'block' : 'none';
   }
 
   // feature-detect real WebP *encoding* support — Safari can read WebP but
@@ -102,27 +289,430 @@ import Footer from '../../components/Footer.astro';
   }
 
   supportsWebpEncode().then((supported) => {
-    if (!supported) {
-      safariWarning.style.display = 'block';
-    }
+    if (!supported) safariWarning.style.display = 'block';
   });
 
-  function updateQualityVisibility() {
-    const fmt = formatSelect.value;
-    qualityRow.style.display = fmt === 'image/png' ? 'none' : 'block';
+  // ---------- recognising HEIC ----------
+  const HEIC_BRANDS = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs'];
+
+  // Some systems give HEIC files an empty or generic type, so look at the file header too.
+  async function sniffHeic(file: File): Promise<boolean> {
+    const head = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+    if (head.length < 12) return false;
+    const four = (i: number) => String.fromCharCode(head[i], head[i + 1], head[i + 2], head[i + 3]);
+    if (four(4) !== 'ftyp') return false;
+    const size = Math.min(((head[0] << 24) | (head[1] << 16) | (head[2] << 8) | head[3]) >>> 0, head.length);
+    const brands = [four(8)];
+    for (let i = 16; i + 4 <= size; i += 4) brands.push(four(i));
+    if (brands.some((b) => HEIC_BRANDS.includes(b))) return true;
+    return brands[0] === 'mif1' && !brands.includes('avif');
   }
-  formatSelect.addEventListener('change', () => {
-    updateQualityVisibility();
-    if (currentImage) runConversion();
-  });
-  updateQualityVisibility();
 
-  qualityRange.addEventListener('input', () => {
-    qualityValue.textContent = qualityRange.value;
-    if (currentImage) runConversion();
-  });
+  async function classify(file: File): Promise<'native' | 'heic' | null> {
+    if (/\.(heic|heif)$/i.test(file.name) || /^image\/hei[cf]/i.test(file.type)) return 'heic';
+    if (file.type === '' || file.type === 'application/octet-stream') {
+      return (await sniffHeic(file)) ? 'heic' : null;
+    }
+    return file.type.startsWith('image/') ? 'native' : null;
+  }
+
+  // ---------- decoding ----------
+  async function decodeNative(file: File, it: Item): Promise<{ source: Source; w: number; h: number }> {
+    if ('createImageBitmap' in window) {
+      try {
+        const bmp = await createImageBitmap(file);
+        return { source: bmp, w: bmp.width, h: bmp.height };
+      } catch {
+        /* fall through to an <img> element */
+      }
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new UserError('This browser can’t open this image.'));
+        el.src = url;
+      });
+      it.sourceUrl = url; // keep alive while the picture is cached
+      return { source: img, w: img.naturalWidth, h: img.naturalHeight };
+    } catch (e) {
+      URL.revokeObjectURL(url);
+      throw e;
+    }
+  }
+
+  function injectScript(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new UserError('Couldn’t load the HEIC decoder. Check your connection and try again.'));
+      document.head.appendChild(s);
+    });
+  }
+
+  let libheifPromise: Promise<any> | null = null;
+
+  function loadLibheif(): Promise<any> {
+    if (!libheifPromise) {
+      libheifPromise = (async () => {
+        const [res] = await Promise.all([fetch(LIBHEIF_WASM), injectScript(LIBHEIF_JS)]);
+        if (!res.ok) throw new UserError('Couldn’t load the HEIC decoder. Check your connection and try again.');
+        const wasmBinary = new Uint8Array(await res.arrayBuffer());
+        const factory = (window as any).libheif;
+        if (typeof factory !== 'function') throw new UserError('The HEIC decoder didn’t start.');
+        return await new Promise<any>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new UserError('The HEIC decoder took too long to start.')), 30000);
+          const mod: any = factory({
+            wasmBinary,
+            onRuntimeInitialized: () => {
+              clearTimeout(timer);
+              queueMicrotask(() => resolve(mod));
+            }
+          });
+        });
+      })().catch((e) => {
+        libheifPromise = null; // allow a retry
+        throw e instanceof UserError ? e : new UserError('The HEIC decoder couldn’t start in this browser.');
+      });
+    }
+    return libheifPromise;
+  }
+
+  async function decodeHeic(file: File): Promise<{ source: Source; w: number; h: number }> {
+    const lib = await loadLibheif();
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let images: any[];
+    try {
+      images = new lib.HeifDecoder().decode(bytes);
+    } catch {
+      throw new UserError('This doesn’t look like a valid HEIC file.');
+    }
+    try {
+      if (!images || !images.length) throw new UserError('This doesn’t look like a valid HEIC file.');
+      const img = images[0];
+      const w = img.get_width();
+      const h = img.get_height();
+      if (w * h > MAX_PIXELS) throw new UserError(`This picture is too large to convert here (${w}×${h}).`);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new UserError('Couldn’t prepare a canvas for this picture.');
+      const data = ctx.createImageData(w, h);
+      await new Promise<void>((resolve, reject) => {
+        img.display(data, (out: unknown) => (out ? resolve() : reject(new UserError('Couldn’t decode this HEIC picture.'))));
+      });
+      ctx.putImageData(data, 0, 0);
+      return { source: canvas, w, h };
+    } finally {
+      for (const im of images ?? []) {
+        try {
+          im.free?.();
+        } catch {
+          /* already freed */
+        }
+      }
+    }
+  }
+
+  async function getSource(it: Item): Promise<{ source: Source; w: number; h: number }> {
+    if (it.source) return { source: it.source, w: it.width, h: it.height };
+    let decoded: { source: Source; w: number; h: number };
+    if (it.kind === 'heic') {
+      // Safari can open HEIC itself; elsewhere fall back to the bundled decoder
+      try {
+        decoded = await decodeNative(it.file, it);
+      } catch {
+        decoded = await decodeHeic(it.file);
+      }
+    } else {
+      decoded = await decodeNative(it.file, it);
+    }
+    if (decoded.w * decoded.h > MAX_PIXELS) {
+      dropSource(it, decoded.source);
+      throw new UserError(`This picture is too large to convert here (${decoded.w}×${decoded.h}).`);
+    }
+    it.width = decoded.w;
+    it.height = decoded.h;
+    if (!it.thumbDrawn) drawThumb(it, decoded.source, decoded.w, decoded.h);
+    const px = decoded.w * decoded.h;
+    if (cachedTotal + px <= CACHE_PIXELS) {
+      it.source = decoded.source;
+      it.cachedPixels = px;
+      cachedTotal += px;
+    }
+    return decoded;
+  }
+
+  function dropSource(it: Item, source?: Source | null) {
+    const s = source ?? it.source;
+    if (s && 'close' in s) (s as ImageBitmap).close();
+    if (it.source) {
+      cachedTotal -= it.cachedPixels;
+      it.source = null;
+      it.cachedPixels = 0;
+    }
+    if (it.sourceUrl) {
+      URL.revokeObjectURL(it.sourceUrl);
+      it.sourceUrl = null;
+    }
+  }
+
+  function releaseSource(source: Source, it: Item) {
+    if ('close' in source) (source as ImageBitmap).close();
+    else if (source instanceof HTMLCanvasElement) source.width = source.height = 0;
+    if (!it.source && it.sourceUrl) {
+      URL.revokeObjectURL(it.sourceUrl);
+      it.sourceUrl = null;
+    }
+  }
+
+  function drawThumb(it: Item, source: Source, w: number, h: number) {
+    const c = document.createElement('canvas');
+    c.width = 112;
+    c.height = 112;
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    const side = Math.min(w, h);
+    ctx.drawImage(source, (w - side) / 2, (h - side) / 2, side, side, 0, 0, 112, 112);
+    it.thumb.textContent = '';
+    it.thumb.appendChild(c);
+    it.thumbDrawn = true;
+  }
+
+  // ---------- conversion ----------
+  function toBlob(canvas: HTMLCanvasElement, type: string, quality: number | undefined): Promise<Blob | null> {
+    return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+  }
+
+  function clearResult(it: Item) {
+    if (it.result) URL.revokeObjectURL(it.result.url);
+    it.result = null;
+  }
+
+  async function convertItem(it: Item) {
+    const gen = settingsGen;
+    let used: Source | null = null;
+    it.state = 'working';
+    renderRow(it);
+    try {
+      const { source, w, h } = await getSource(it);
+      used = source;
+      const targetType = formatSelect.value;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new UserError('Couldn’t prepare a canvas for this picture.');
+      if (targetType === 'image/jpeg') {
+        // JPEG has no transparency: put the picture on white instead of black
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+      }
+      ctx.drawImage(source, 0, 0);
+      const blob = await toBlob(canvas, targetType, targetType === 'image/png' ? undefined : Number(qualityRange.value) / 100);
+      canvas.width = canvas.height = 0; // release the pixel buffer right away
+      if (!blob) throw new UserError('This browser couldn’t save the picture. It may be too large for it.');
+      if (it.removed) return;
+      if (gen !== settingsGen) {
+        it.state = 'queued'; // settings changed while this one was converting: do it again
+        return;
+      }
+      // Safari silently returns PNG when WebP encoding isn't supported —
+      // reflect the real output type rather than what was requested
+      const actualType = blob.type || targetType;
+      const name = `${safeStem(it.file.name)}.${extFor(actualType)}`;
+      clearResult(it);
+      it.result = { blob, type: actualType, name, url: URL.createObjectURL(blob) };
+      it.state = 'done';
+      it.error = '';
+    } catch (e) {
+      if (it.removed) return;
+      it.state = 'error';
+      it.error = e instanceof UserError ? e.message : 'Couldn’t convert this file.';
+      clearResult(it);
+    } finally {
+      // a decoded picture that didn't fit in the in-memory budget is let go now and decoded again if needed
+      if (used && it.source !== used) releaseSource(used, it);
+      if (!it.removed) renderRow(it);
+    }
+  }
+
+  async function pump() {
+    if (pumping) return;
+    pumping = true;
+    try {
+      for (;;) {
+        const next = items.find((i) => i.state === 'queued');
+        if (!next) break;
+        await convertItem(next);
+        await new Promise((r) => setTimeout(r)); // let the page breathe between files
+      }
+    } finally {
+      pumping = false;
+      updateSummary();
+    }
+  }
+
+  function requeueAll() {
+    settingsGen++;
+    for (const it of items) {
+      if (it.state !== 'working') it.state = 'queued';
+      if (it.state === 'queued') renderRow(it);
+    }
+    updateSummary();
+    pump();
+  }
+
+  // ---------- rows ----------
+  function makeRow(file: File, kind: 'native' | 'heic'): Item {
+    const row = document.createElement('li');
+    row.className = 'jd-row';
+    const thumb = document.createElement('div');
+    thumb.className = 'jd-thumb';
+    thumb.textContent = kind === 'heic' ? 'HEIC' : '';
+    const text = document.createElement('div');
+    text.style.minWidth = '0';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'jd-name';
+    nameEl.textContent = file.name;
+    nameEl.title = file.name;
+    const info = document.createElement('div');
+    info.className = 'jd-info';
+    text.append(nameEl, info);
+    const actions = document.createElement('div');
+    actions.className = 'jd-actions';
+    row.append(thumb, text, actions);
+    const it: Item = {
+      id: nextId++,
+      file,
+      kind,
+      state: 'queued',
+      error: '',
+      width: 0,
+      height: 0,
+      source: null,
+      sourceUrl: null,
+      cachedPixels: 0,
+      thumbDrawn: false,
+      result: null,
+      removed: false,
+      row,
+      thumb,
+      info,
+      actions
+    };
+    return it;
+  }
+
+  function renderRow(it: Item) {
+    const orig = `${label(it.file.type || (it.kind === 'heic' ? 'image/heic' : 'image/png'))} · ${formatBytes(it.file.size)}${it.width ? ` · ${it.width}×${it.height}` : ''}`;
+    it.info.className = 'jd-info';
+    it.actions.textContent = '';
+
+    if (it.state === 'done' && it.result) {
+      const r = it.result;
+      const savings = Math.round((1 - r.blob.size / it.file.size) * 100);
+      const savingsText = savings > 0 ? ` (${savings}% smaller)` : savings < 0 ? ` (${Math.abs(savings)}% larger)` : '';
+      it.info.className = 'jd-info jd-result';
+      it.info.textContent = `${label(it.file.type || 'image/heic')} ${formatBytes(it.file.size)} → ${label(r.type)} ${formatBytes(r.blob.size)}${savingsText}`;
+      const dl = document.createElement('a');
+      dl.className = 'jd-dl';
+      dl.href = r.url;
+      dl.download = r.name;
+      dl.textContent = 'Download';
+      dl.setAttribute('aria-label', `Download ${r.name}`);
+      it.actions.appendChild(dl);
+    } else if (it.state === 'error') {
+      it.info.className = 'jd-info jd-error';
+      it.info.textContent = it.error;
+    } else if (it.state === 'working') {
+      it.info.textContent = it.kind === 'heic' ? `${orig} · decoding HEIC…` : `${orig} · converting…`;
+    } else {
+      it.info.textContent = `${orig} · waiting…`;
+    }
+
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'jd-x';
+    x.textContent = '×';
+    x.setAttribute('aria-label', `Remove ${it.file.name}`);
+    x.addEventListener('click', () => removeItem(it));
+    it.actions.appendChild(x);
+    updateSummary();
+  }
+
+  function removeItem(it: Item) {
+    it.removed = true;
+    clearResult(it);
+    dropSource(it);
+    it.row.remove();
+    const i = items.indexOf(it);
+    if (i >= 0) items.splice(i, 1);
+    if (!items.length) controls.style.display = 'none';
+    updateSummary();
+  }
+
+  function updateSummary() {
+    const done = items.filter((i) => i.state === 'done');
+    const failed = items.filter((i) => i.state === 'error').length;
+    const pending = items.filter((i) => i.state === 'queued' || i.state === 'working').length;
+    const before = done.reduce((s, i) => s + i.file.size, 0);
+    const after = done.reduce((s, i) => s + (i.result?.blob.size ?? 0), 0);
+    const parts = [`${items.length} file${items.length === 1 ? '' : 's'}`];
+    if (done.length) parts.push(`${done.length} converted (${formatBytes(before)} → ${formatBytes(after)})`);
+    if (pending) parts.push(`${pending} to go`);
+    if (failed) parts.push(`${failed} failed`);
+    summary.textContent = items.length ? parts.join(' · ') : '';
+    zipBtn.style.display = done.length >= 2 ? 'inline-block' : 'none';
+  }
+
+  // ---------- adding files ----------
+  async function addFiles(list: FileList | File[]) {
+    const files = Array.from(list);
+    if (!files.length) return;
+    const room = MAX_FILES - items.length;
+    const accepted: Item[] = [];
+    let skipped = 0;
+    let tooBig = 0;
+    for (const file of files) {
+      if (accepted.length >= room) break;
+      const kind = await classify(file);
+      if (!kind) {
+        skipped++;
+        continue;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        tooBig++;
+        continue;
+      }
+      accepted.push(makeRow(file, kind));
+    }
+    const overflow = Math.max(0, files.length - skipped - tooBig - accepted.length);
+    const messages: string[] = [];
+    if (skipped) messages.push(`${skipped} file${skipped === 1 ? ' isn’t' : 's aren’t'} a supported image and ${skipped === 1 ? 'was' : 'were'} skipped.`);
+    if (tooBig) messages.push(`${tooBig} file${tooBig === 1 ? ' is' : 's are'} over ${MAX_FILE_BYTES / 1024 / 1024} MB and ${tooBig === 1 ? 'was' : 'were'} skipped.`);
+    if (overflow) messages.push(`Only ${MAX_FILES} files fit at a time, so ${overflow} ${overflow === 1 ? 'was' : 'were'} left out.`);
+    showNotice(messages.join(' '));
+    if (!accepted.length) return;
+    for (const it of accepted) {
+      items.push(it);
+      fileList.appendChild(it.row);
+      renderRow(it);
+    }
+    controls.style.display = 'flex';
+    pump();
+  }
 
   dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
   dropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropzone.style.borderColor = 'var(--accent)';
@@ -133,62 +723,145 @@ import Footer from '../../components/Footer.astro';
   dropzone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzone.style.borderColor = 'var(--border)';
-    const file = e.dataTransfer?.files[0];
-    if (file) loadFile(file);
+    if (e.dataTransfer?.files.length) addFiles(e.dataTransfer.files);
   });
   fileInput.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
-    if (file) loadFile(file);
+    if (fileInput.files?.length) addFiles(fileInput.files);
+    fileInput.value = ''; // allow choosing the same files again
   });
 
-  function loadFile(file: File) {
-    if (!file.type.startsWith('image/')) return;
-    currentFile = file;
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      currentImage = img;
-      previewImg.src = url;
-      originalInfo.textContent = `Original: ${file.type.replace('image/', '').toUpperCase()} · ${formatBytes(file.size)} · ${img.width}×${img.height}`;
-      controls.style.display = 'flex';
-      resultInfo.style.display = 'none';
-      downloadLink.style.display = 'none';
-      runConversion();
-    };
-    img.src = url;
+  clearBtn.addEventListener('click', () => {
+    for (const it of [...items]) removeItem(it);
+    showNotice('');
+  });
+
+  // ---------- settings ----------
+  function updateQualityVisibility() {
+    qualityRow.style.display = formatSelect.value === 'image/png' ? 'none' : 'block';
+  }
+  updateQualityVisibility();
+
+  formatSelect.addEventListener('change', () => {
+    updateQualityVisibility();
+    requeueAll();
+  });
+
+  let qualityTimer: number | undefined;
+  qualityRange.addEventListener('input', () => {
+    qualityValue.textContent = qualityRange.value;
+    clearTimeout(qualityTimer);
+    qualityTimer = window.setTimeout(requeueAll, 300);
+  });
+
+  // ---------- zip download (stored, no compression: images are already compressed) ----------
+  const CRC_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32(data: Uint8Array): number {
+    let c = 0xffffffff;
+    for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
   }
 
-  function runConversion() {
-    if (!currentImage || !currentFile) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = currentImage.naturalWidth;
-    canvas.height = currentImage.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(currentImage, 0, 0);
+  async function makeZip(files: { name: string; blob: Blob }[]): Promise<Blob> {
+    const enc = new TextEncoder();
+    const d = new Date();
+    const dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    const dosDate = (Math.max(0, d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    const parts: BlobPart[] = [];
+    const central: Uint8Array[] = [];
+    let offset = 0;
 
-    const targetType = formatSelect.value;
-    const quality = Number(qualityRange.value) / 100;
-    const useQuality = targetType !== 'image/png';
+    for (const f of files) {
+      const data = new Uint8Array(await f.blob.arrayBuffer());
+      const crc = crc32(data);
+      const nameBytes = enc.encode(f.name);
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        // Safari silently returns PNG when WebP encoding isn't supported —
-        // reflect the real output type rather than what was requested
-        const actualType = blob.type || targetType;
-        const savings = currentFile ? Math.round((1 - blob.size / currentFile.size) * 100) : 0;
-        const savingsText = savings > 0 ? ` (${savings}% smaller)` : savings < 0 ? ` (${Math.abs(savings)}% larger)` : '';
-        resultInfo.textContent = `Result: ${actualType.replace('image/', '').toUpperCase()} · ${formatBytes(blob.size)}${savingsText}`;
-        resultInfo.style.display = 'block';
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true); // version needed
+      local.setUint16(6, 0x0800, true); // UTF-8 names
+      local.setUint16(8, 0, true); // stored
+      local.setUint16(10, dosTime, true);
+      local.setUint16(12, dosDate, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, data.length, true);
+      local.setUint32(22, data.length, true);
+      local.setUint16(26, nameBytes.length, true);
+      local.setUint16(28, 0, true);
+      parts.push(local.buffer, nameBytes, data);
 
-        const url = URL.createObjectURL(blob);
-        downloadLink.href = url;
-        downloadLink.download = `converted.${extFor(actualType)}`;
-        downloadLink.style.display = 'inline-block';
-      },
-      targetType,
-      useQuality ? quality : undefined
-    );
+      const cen = new DataView(new ArrayBuffer(46));
+      cen.setUint32(0, 0x02014b50, true);
+      cen.setUint16(4, 20, true);
+      cen.setUint16(6, 20, true);
+      cen.setUint16(8, 0x0800, true);
+      cen.setUint16(10, 0, true);
+      cen.setUint16(12, dosTime, true);
+      cen.setUint16(14, dosDate, true);
+      cen.setUint32(16, crc, true);
+      cen.setUint32(20, data.length, true);
+      cen.setUint32(24, data.length, true);
+      cen.setUint16(28, nameBytes.length, true);
+      cen.setUint32(42, offset, true);
+      const entry = new Uint8Array(46 + nameBytes.length);
+      entry.set(new Uint8Array(cen.buffer), 0);
+      entry.set(nameBytes, 46);
+      central.push(entry);
+
+      offset += 30 + nameBytes.length + data.length;
+      if (offset > 0xf0000000) throw new UserError('These files add up to more than a zip file can hold. Download them in smaller groups.');
+    }
+
+    const centralSize = central.reduce((s, e) => s + e.length, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, files.length, true);
+    end.setUint16(10, files.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
   }
+
+  function uniqueNames(names: string[]): string[] {
+    const seen = new Map<string, number>();
+    return names.map((n) => {
+      const key = n.toLowerCase();
+      const count = (seen.get(key) ?? 0) + 1;
+      seen.set(key, count);
+      if (count === 1) return n;
+      const dot = n.lastIndexOf('.');
+      return `${n.slice(0, dot)}-${count}${n.slice(dot)}`;
+    });
+  }
+
+  zipBtn.addEventListener('click', async () => {
+    const done = items.filter((i) => i.state === 'done' && i.result);
+    if (done.length < 2) return;
+    zipBtn.disabled = true;
+    const original = zipBtn.textContent;
+    zipBtn.textContent = 'Zipping…';
+    try {
+      const names = uniqueNames(done.map((i) => (i.result as Result).name));
+      const zip = await makeZip(done.map((i, n) => ({ name: names[n], blob: (i.result as Result).blob })));
+      const url = URL.createObjectURL(zip);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'jackdaw-converted.zip';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      showNotice(e instanceof UserError ? e.message : 'Couldn’t make the zip file.');
+    } finally {
+      zipBtn.disabled = false;
+      zipBtn.textContent = original;
+    }
+  });
 </script>
