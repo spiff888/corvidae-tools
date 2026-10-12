@@ -12,7 +12,7 @@ import Footer from '../../components/Footer.astro';
         <h1 style="font-size: 32px; margin: 0;">Jackdaw</h1>
         <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Coloeus monedula</span>
       </div>
-      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Convert images between JPEG, PNG and WebP, including iPhone HEIC photos, several at a time. Everything happens on your device &mdash; the files never leave your browser.</p>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Convert images between JPEG, PNG and WebP, including iPhone HEIC photos, several at a time, with optional resizing and smaller PNGs. Everything happens on your device &mdash; the files never leave your browser.</p>
     </div>
     <img src="/jackdaw-mark.webp" alt="" width="220" height="239" style="width: 220px; height: auto; flex-shrink: 0;" />
   </div>
@@ -42,6 +42,33 @@ import Footer from '../../components/Footer.astro';
           Quality: <span id="quality-value">85</span>%
         </label>
         <input type="range" id="quality-range" min="1" max="100" value="85" style="width: 100%;" />
+      </div>
+      <div id="png-row" style="display: none;">
+        <label for="png-select" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">PNG size</label>
+        <select id="png-select" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; min-width: 200px;">
+          <option value="optimized">Optimized (lossless)</option>
+          <option value="smallest">Smallest (256 colors)</option>
+          <option value="standard">Standard (fastest)</option>
+        </select>
+      </div>
+      <div>
+        <label for="resize-select" style="display: block; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-bottom: 8px;">Resize</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="resize-select" style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; min-width: 190px;">
+            <option value="0">Original size</option>
+            <option value="3840">3840 px (4K)</option>
+            <option value="2560">2560 px</option>
+            <option value="1920">1920 px (Full HD)</option>
+            <option value="1600">1600 px</option>
+            <option value="1280">1280 px</option>
+            <option value="1024">1024 px</option>
+            <option value="800">800 px</option>
+            <option value="640">640 px</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <input type="number" id="resize-custom" min="16" max="16000" step="1" value="1500" aria-label="Longest side in pixels" style="display: none; width: 90px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px;" />
+        </div>
+        <div style="margin-top: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--text-faint);">Longest side. Never enlarges.</div>
       </div>
     </div>
 
@@ -199,6 +226,10 @@ import Footer from '../../components/Footer.astro';
   const qualityRow = document.getElementById('quality-row') as HTMLDivElement;
   const qualityRange = document.getElementById('quality-range') as HTMLInputElement;
   const qualityValue = document.getElementById('quality-value') as HTMLSpanElement;
+  const pngRow = document.getElementById('png-row') as HTMLDivElement;
+  const pngSelect = document.getElementById('png-select') as HTMLSelectElement;
+  const resizeSelect = document.getElementById('resize-select') as HTMLSelectElement;
+  const resizeCustom = document.getElementById('resize-custom') as HTMLInputElement;
   const summary = document.getElementById('summary') as HTMLParagraphElement;
   const zipBtn = document.getElementById('zip-btn') as HTMLButtonElement;
   const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement;
@@ -212,9 +243,12 @@ import Footer from '../../components/Footer.astro';
   const CACHE_PIXELS = 60_000_000; // keep decoded pictures in memory up to this many pixels in total, re-decode beyond it
   const LIBHEIF_JS = '/vendor/libheif/libheif.js';
   const LIBHEIF_WASM = '/vendor/libheif/libheif.wasm';
+  const PNG_WORKER = '/vendor/png/png-worker.js';
+  const OPT_PIXELS = 24_000_000; // larger pictures are saved as standard PNG: the optimizer would need too much memory
+  const MAX_SIDE = 16000;
 
   type Source = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
-  type Result = { blob: Blob; type: string; name: string; url: string };
+  type Result = { blob: Blob; type: string; name: string; url: string; w: number; h: number };
   type Item = {
     id: number;
     file: File;
@@ -482,6 +516,124 @@ import Footer from '../../components/Footer.astro';
     it.thumbDrawn = true;
   }
 
+  // ---------- resizing ----------
+  function maxSide(): number {
+    if (resizeSelect.value === 'custom') {
+      const n = Math.round(Number(resizeCustom.value));
+      return Number.isFinite(n) && n >= 16 ? Math.min(n, MAX_SIDE) : 0;
+    }
+    return Number(resizeSelect.value) || 0;
+  }
+
+  function targetSize(w: number, h: number): [number, number] {
+    const side = maxSide();
+    const longest = Math.max(w, h);
+    if (!side || longest <= side) return [w, h];
+    const k = side / longest;
+    return [Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))];
+  }
+
+  // Shrink in halving steps, then a last step to the exact size: much sharper than one big jump.
+  function drawScaled(source: Source, w: number, h: number, tw: number, th: number, whiteBackground: boolean): HTMLCanvasElement | null {
+    let cur: Source = source;
+    let cw = w;
+    let ch = h;
+    let temp: HTMLCanvasElement | null = null;
+    const make = (cw2: number, ch2: number) => {
+      const c = document.createElement('canvas');
+      c.width = cw2;
+      c.height = ch2;
+      return c;
+    };
+    while (cw >= tw * 2 && ch >= th * 2) {
+      const nw = Math.max(tw, Math.ceil(cw / 2));
+      const nh = Math.max(th, Math.ceil(ch / 2));
+      const c = make(nw, nh);
+      const cx = c.getContext('2d');
+      if (!cx) return null;
+      cx.imageSmoothingEnabled = true;
+      cx.imageSmoothingQuality = 'high';
+      cx.drawImage(cur, 0, 0, cw, ch, 0, 0, nw, nh);
+      if (temp) temp.width = temp.height = 0;
+      temp = c;
+      cur = c;
+      cw = nw;
+      ch = nh;
+    }
+    const out = make(tw, th);
+    const ctx = out.getContext('2d');
+    if (!ctx) return null;
+    if (whiteBackground) {
+      // JPEG has no transparency: put the picture on white instead of black
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, tw, th);
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cur, 0, 0, cw, ch, 0, 0, tw, th);
+    if (temp) temp.width = temp.height = 0;
+    return out;
+  }
+
+  // ---------- PNG optimizer (runs in a worker so the page stays responsive) ----------
+  let pngWorker: Worker | null = null;
+  let pngJobId = 0;
+  const pngJobs = new Map<number, { resolve: (b: ArrayBuffer) => void; reject: (e: Error) => void }>();
+  const PNG_NOTICE = 'Some pictures were too large to optimize and were saved as standard PNG.';
+
+  function getPngWorker(): Worker {
+    if (pngWorker) return pngWorker;
+    const w = new Worker(PNG_WORKER);
+    w.onmessage = (e: MessageEvent) => {
+      const job = pngJobs.get(e.data.id);
+      if (!job) return;
+      pngJobs.delete(e.data.id);
+      if (e.data.ok) job.resolve(e.data.out);
+      else job.reject(new Error('png'));
+    };
+    w.onerror = () => {
+      for (const job of pngJobs.values()) job.reject(new Error('worker'));
+      pngJobs.clear();
+      w.terminate();
+      if (pngWorker === w) pngWorker = null;
+    };
+    pngWorker = w;
+    return w;
+  }
+
+  function pngJob(buf: ArrayBuffer, w: number, h: number, cnum: number): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const id = ++pngJobId;
+      pngJobs.set(id, { resolve, reject });
+      try {
+        getPngWorker().postMessage({ id, buf, w, h, cnum }, [buf]);
+      } catch (e) {
+        pngJobs.delete(id);
+        reject(e as Error);
+      }
+    });
+  }
+
+  async function encodePng(canvas: HTMLCanvasElement, w: number, h: number, mode: string): Promise<Blob | null> {
+    const standard = await toBlob(canvas, 'image/png', undefined);
+    if (mode === 'standard') return standard;
+    if (w * h > OPT_PIXELS) {
+      showNotice(PNG_NOTICE);
+      return standard;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return standard;
+    try {
+      const data = ctx.getImageData(0, 0, w, h);
+      const out = await pngJob(data.data.buffer as ArrayBuffer, w, h, mode === 'smallest' ? 256 : 0);
+      const blob = new Blob([out], { type: 'image/png' });
+      // the lossless pass should never make a file bigger than the browser's own PNG
+      return standard && mode === 'optimized' && standard.size <= blob.size ? standard : blob;
+    } catch {
+      return standard;
+    }
+  }
+
   // ---------- conversion ----------
   function toBlob(canvas: HTMLCanvasElement, type: string, quality: number | undefined): Promise<Blob | null> {
     return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
@@ -501,18 +653,14 @@ import Footer from '../../components/Footer.astro';
       const { source, w, h } = await getSource(it);
       used = source;
       const targetType = formatSelect.value;
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new UserError('Couldn’t prepare a canvas for this picture.');
-      if (targetType === 'image/jpeg') {
-        // JPEG has no transparency: put the picture on white instead of black
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, w, h);
-      }
-      ctx.drawImage(source, 0, 0);
-      const blob = await toBlob(canvas, targetType, targetType === 'image/png' ? undefined : Number(qualityRange.value) / 100);
+      const pngMode = pngSelect.value;
+      const [tw, th] = targetSize(w, h);
+      const canvas = drawScaled(source, w, h, tw, th, targetType === 'image/jpeg');
+      if (!canvas) throw new UserError('Couldn’t prepare a canvas for this picture.');
+      const blob =
+        targetType === 'image/png'
+          ? await encodePng(canvas, tw, th, pngMode)
+          : await toBlob(canvas, targetType, Number(qualityRange.value) / 100);
       canvas.width = canvas.height = 0; // release the pixel buffer right away
       if (!blob) throw new UserError('This browser couldn’t save the picture. It may be too large for it.');
       if (it.removed) return;
@@ -525,7 +673,7 @@ import Footer from '../../components/Footer.astro';
       const actualType = blob.type || targetType;
       const name = `${safeStem(it.file.name)}.${extFor(actualType)}`;
       clearResult(it);
-      it.result = { blob, type: actualType, name, url: URL.createObjectURL(blob) };
+      it.result = { blob, type: actualType, name, url: URL.createObjectURL(blob), w: tw, h: th };
       it.state = 'done';
       it.error = '';
     } catch (e) {
@@ -558,6 +706,7 @@ import Footer from '../../components/Footer.astro';
 
   function requeueAll() {
     settingsGen++;
+    if (notice.textContent === PNG_NOTICE) showNotice('');
     for (const it of items) {
       if (it.state !== 'working') it.state = 'queued';
       if (it.state === 'queued') renderRow(it);
@@ -617,7 +766,8 @@ import Footer from '../../components/Footer.astro';
       const savings = Math.round((1 - r.blob.size / it.file.size) * 100);
       const savingsText = savings > 0 ? ` (${savings}% smaller)` : savings < 0 ? ` (${Math.abs(savings)}% larger)` : '';
       it.info.className = 'jd-info jd-result';
-      it.info.textContent = `${label(it.file.type || 'image/heic')} ${formatBytes(it.file.size)} → ${label(r.type)} ${formatBytes(r.blob.size)}${savingsText}`;
+      const resized = it.width && (r.w !== it.width || r.h !== it.height) ? ` · ${r.w}×${r.h}` : '';
+      it.info.textContent = `${label(it.file.type || 'image/heic')} ${formatBytes(it.file.size)} → ${label(r.type)} ${formatBytes(r.blob.size)}${savingsText}${resized}`;
       const dl = document.createElement('a');
       dl.className = 'jd-dl';
       dl.href = r.url;
@@ -737,13 +887,27 @@ import Footer from '../../components/Footer.astro';
 
   // ---------- settings ----------
   function updateQualityVisibility() {
-    qualityRow.style.display = formatSelect.value === 'image/png' ? 'none' : 'block';
+    const png = formatSelect.value === 'image/png';
+    qualityRow.style.display = png ? 'none' : 'block';
+    pngRow.style.display = png ? 'block' : 'none';
   }
   updateQualityVisibility();
 
   formatSelect.addEventListener('change', () => {
     updateQualityVisibility();
     requeueAll();
+  });
+
+  pngSelect.addEventListener('change', requeueAll);
+
+  resizeSelect.addEventListener('change', () => {
+    resizeCustom.style.display = resizeSelect.value === 'custom' ? 'block' : 'none';
+    requeueAll();
+  });
+  let resizeTimer: number | undefined;
+  resizeCustom.addEventListener('input', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(requeueAll, 500);
   });
 
   let qualityTimer: number | undefined;
