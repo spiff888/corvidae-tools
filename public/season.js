@@ -85,7 +85,7 @@
       if (within(md(y, L[3]) - 1, md(y, L[3]))) return 'qixi';
       if (within(md(y, L[4]) - 5, md(y, L[4]))) return 'midautumn';
     }
-    if (within(dn(y, 9, 5), dn(y, 9, 12))) return 'doubleten';
+    if (within(dn(y, 9, 5), dn(y, 9, 10))) return 'doubleten';
     if (within(dn(y, 0, 1), dn(y, 0, 3)) || within(dn(y, 11, 30), dn(y, 11, 31))) return 'newyear';
     if (within(dn(y, 1, 7), dn(y, 1, 14))) return 'valentines';
     var es = easter(y);
@@ -216,12 +216,42 @@
     svg('season-lantern season-lantern-r', '0 0 60 100', body('r'));
   }
 
+  // Star of Bethlehem: a long four-point star with a soft glow, top corner
+  function star() {
+    svg('season-star', '0 0 120 140',
+      '<defs><radialGradient id="sg" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff3b0" stop-opacity="0.75"/><stop offset="0.45" stop-color="#ffd25a" stop-opacity="0.25"/><stop offset="1" stop-color="#ffd25a" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="sb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a0" stop-opacity="0.35"/><stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/></linearGradient></defs>' +
+      '<g class="season-star-pulse">' +
+      '<circle cx="60" cy="62" r="60" fill="url(#sg)"/>' +
+      '<polygon points="52,66 68,66 76,140 44,140" fill="url(#sb)"/>' +
+      '<polygon points="60,4 67.5,54.5 108,62 67.5,69.5 60,126 52.5,69.5 12,62 52.5,54.5" fill="#ffe27a" stroke="#c9962b" stroke-width="1.2" stroke-linejoin="round"/>' +
+      '<polygon points="60,62 83,39 66,60 83,85 60,64 37,85 54,60 37,39" fill="#fff4c4" opacity="0.8"/>' +
+      '<circle cx="60" cy="62" r="5" fill="#fffdf0"/></g>');
+  }
+
+  // Three crosses on a hill at dawn, bottom corner
+  function crosses() {
+    var cross = function (x, y, h, w) {
+      var a = h * 0.3;
+      return '<rect x="' + (x - w / 2) + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="1.2" fill="#f4ead2" stroke="#6b5a3a" stroke-width="0.8"/>' +
+        '<rect x="' + (x - h * 0.22) + '" y="' + (y + a) + '" width="' + (h * 0.44) + '" height="' + w + '" rx="1.2" fill="#f4ead2" stroke="#6b5a3a" stroke-width="0.8"/>';
+    };
+    svg('season-crosses', '0 0 240 130',
+      '<defs><radialGradient id="cg" cx="0.5" cy="1" r="0.8"><stop offset="0" stop-color="#ffe9a8" stop-opacity="0.7"/><stop offset="0.5" stop-color="#d9c2ff" stop-opacity="0.22"/><stop offset="1" stop-color="#d9c2ff" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="ch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4490"/><stop offset="1" stop-color="#2a1f4a"/></linearGradient></defs>' +
+      '<ellipse cx="120" cy="124" rx="118" ry="104" fill="url(#cg)"/>' +
+      '<path d="M0,130 Q20,112 60,106 Q100,98 120,98 Q150,98 190,106 Q226,112 240,130 Z" fill="url(#ch)" stroke="#8a74c4" stroke-width="1.2"/>' +
+      cross(78, 52, 50, 6) + cross(162, 52, 50, 6) + cross(120, 34, 66, 7.5));
+  }
+
   function mountScenery() {
     unmountScenery();
     if (season === 'doubleten') tower();
     else if (season === 'dragonboat') boat();
     else if (season === 'midautumn') moon();
     else if (season === 'lunarnewyear') lanterns();
+    else if (season === 'christmas') star();
+    else if (season === 'easter') crosses();
     var g = document.getElementById('season-greeting');
     if (g) {
       g.textContent = GREETING[season] || '';
