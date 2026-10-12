@@ -37,7 +37,200 @@ a {
 
 a:hover {
   color: #9db9ea;
+  color: color-mix(in srgb, var(--accent) 55%, #fff);
   text-decoration: underline;
+}
+
+/* Seasonal themes (chosen by /season.js). The accent color changes, and a few
+   decorations are drawn in code for some holidays. */
+html[data-season='newyear'] { --accent: #f2c94c; }
+html[data-season='valentines'] { --accent: #ff7eb6; }
+html[data-season='easter'] { --accent: #c6a8ff; }
+html[data-season='july4'] { --accent: #7db2ff; }
+html[data-season='halloween'] { --accent: #ff8a3d; }
+html[data-season='thanksgiving'] { --accent: #e8a53a; }
+html[data-season='christmas'] { --accent: #ff7a7a; }
+html[data-season='doubleten'] { --accent: #ff6b72; }
+html[data-season='dragonboat'] { --accent: #5fcf8a; }
+html[data-season='midautumn'] { --accent: #ffd479; }
+html[data-season='lunarnewyear'] { --accent: #ffcc4d; }
+html[data-season='lanternfest'] { --accent: #ffb347; }
+html[data-season='qixi'] { --accent: #c792ff; }
+
+.season-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.season-deco {
+  position: fixed;
+  pointer-events: none;
+  z-index: 39;
+}
+
+.season-tower {
+  right: 6px;
+  bottom: 0;
+  height: min(40vh, 310px);
+  width: auto;
+  aspect-ratio: 120 / 480;
+}
+
+html[data-season="doubleten"] .footer {
+  padding-right: 84px; /* keep the footer text clear of the tower */
+}
+
+.season-tower-img {
+  aspect-ratio: 163 / 720;
+  object-fit: contain;
+}
+
+.t101w {
+  animation: season-twinkle 4.8s ease-in-out infinite;
+}
+
+.season-boat {
+  left: 0;
+  bottom: 6px;
+  width: 210px;
+  height: auto;
+  animation: season-sail 60s linear infinite;
+}
+
+.season-bob {
+  animation: season-bob 2.6s ease-in-out infinite;
+  transform-origin: 130px 60px;
+}
+
+.season-oar {
+  animation: season-row 1.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.season-moon {
+  top: 14px;
+  right: 36px;
+  width: min(26vw, 210px);
+  height: auto;
+  opacity: 0.5;
+  animation: season-glow 7s ease-in-out infinite;
+}
+
+.season-lantern {
+  top: 0;
+  width: 50px;
+  height: auto;
+  animation: season-swing 4.5s ease-in-out infinite;
+  transform-origin: 50% 0;
+}
+
+.season-lantern-l {
+  left: 3vw;
+}
+
+.season-lantern-r {
+  right: 3vw;
+  animation-delay: -2.2s;
+}
+
+@keyframes season-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes season-sail {
+  from { transform: translateX(-240px); }
+  to { transform: translateX(100vw); }
+}
+
+@keyframes season-bob {
+  0%, 100% { transform: translateY(0) rotate(-0.6deg); }
+  50% { transform: translateY(-2.5px) rotate(0.6deg); }
+}
+
+@keyframes season-row {
+  0%, 100% { transform: rotate(-9deg); }
+  50% { transform: rotate(9deg); }
+}
+
+@keyframes season-glow {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 0.58; }
+}
+
+@keyframes season-swing {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@media (max-width: 600px) {
+  .season-tower {
+    right: 4px;
+    height: min(26vh, 190px);
+  }
+  .season-boat {
+    width: 150px;
+  }
+  .season-moon {
+    top: 8px;
+    right: 8px;
+    width: 30vw;
+  }
+  .season-lantern {
+    width: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .season-deco,
+  .season-deco *,
+  .t101w {
+    animation: none !important;
+  }
+  .season-boat {
+    transform: translateX(8vw);
+  }
+}
+
+.season-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-faint);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.season-toggle[hidden],
+.season-greeting[hidden] {
+  display: none;
+}
+
+.season-toggle:hover {
+  color: var(--text);
+}
+
+.season-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.season-greeting {
+  color: var(--accent);
+  font-family: var(--font-mono), 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+}
+
+@media print {
+  .season-canvas,
+  .season-deco {
+    display: none;
+  }
 }
 
 .wrap {

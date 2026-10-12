@@ -30,7 +30,7 @@ export default defineConfig({
         // Pages, scripts and icons are cached up front, so every tool opens offline.
         // The large bird art is cached the first time each page is viewed instead.
         globPatterns: ['**/*.{html,js,css,svg,ico,webmanifest}', 'favicon-*.png', 'icon-*.png', 'apple-touch-icon.png'],
-        // The HEIC decoder (about 1.5 MB) and PNG optimizer are only downloaded when needed, then cached below.
+        // The HEIC decoder (about 1.5 MB), PNG optimizer and OCR engine (about 7 MB) are only downloaded when needed, then cached below.
         globIgnores: ['vendor/**'],
         navigateFallback: null,
         runtimeCaching: [
@@ -43,6 +43,12 @@ export default defineConfig({
             urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/vendor/libheif/'),
             handler: 'CacheFirst',
             options: { cacheName: 'heic-decoder', expiration: { maxEntries: 6 } }
+          },
+          {
+            // OCR engine (about 7 MB, from /vendor/tesseract/): downloaded when someone first reads an image, then kept for offline use
+            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/vendor/tesseract/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'ocr-engine', expiration: { maxEntries: 8 } }
           },
           {
             // PNG optimizer worker (about 65 KB): fetched when a PNG is optimized, then kept for offline use

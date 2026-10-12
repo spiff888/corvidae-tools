@@ -80,6 +80,21 @@ public/
 - Everything happens in-memory in the browser tab; nothing is sent
   anywhere, and the file is discarded when the tab closes.
   
+## Notes on Eurasian Jay (image to text)
+
+- OCR runs in the browser with [tesseract.js](https://github.com/naptha/tesseract.js)
+  (Apache-2.0). The engine, worker and English model are self-hosted under
+  `public/vendor/tesseract/` (about 7 MB is fetched, and only when someone first
+  reads an image). Nothing is loaded from a third-party CDN, so the CSP needs
+  no extra hosts; it relies on the existing `worker-src 'self'` and
+  `'wasm-unsafe-eval'`.
+- The service worker does not precache `vendor/**`; a runtime `CacheFirst` rule
+  (`ocr-engine`) keeps the files after first use so the tool works offline.
+- Small pictures are enlarged, huge ones shrunk, and light-on-dark text is
+  inverted before recognition, which noticeably improves accuracy.
+- English only for now. Another language means adding its `.traineddata.gz` to
+  `public/vendor/tesseract/lang/` (the Chinese models are large).
+
 ## License
   
   Code: GPL-3.0-or-later. © 2026 Philip Gaw. See [LICENSE](LICENSE).

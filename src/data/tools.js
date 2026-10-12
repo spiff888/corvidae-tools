@@ -57,5 +57,13 @@ export const tools = [
     description: 'DMX calculator: DIP switches, universes, Art-Net and sACN.',
     status: 'beta',
     href: '/tools/bluejay'
+  },
+  {
+    slug: 'eurasianjay',
+    name: 'Eurasian Jay',
+    latin: 'Garrulus glandarius',
+    description: 'Pull the text out of a screenshot or photo (OCR). Runs entirely in your browser.',
+    status: 'beta',
+    href: '/tools/eurasianjay'
   }
 ];
