@@ -46,6 +46,8 @@ a:hover {
 html[data-season='newyear'] { --accent: #f2c94c; }
 html[data-season='valentines'] { --accent: #ff7eb6; }
 html[data-season='easter'] { --accent: #c6a8ff; }
+html[data-season='palmsunday'] { --accent: #8fdc8a; }
+html[data-season='eastersunday'] { --accent: #ffd479; }
 html[data-season='july4'] { --accent: #7db2ff; }
 html[data-season='halloween'] { --accent: #ff8a3d; }
 html[data-season='thanksgiving'] { --accent: #e8a53a; }
@@ -140,8 +142,48 @@ html[data-season="doubleten"] .footer {
   height: auto;
 }
 
-html[data-season="easter"] .footer {
+html[data-season="easter"] .footer,
+html[data-season="palmsunday"] .footer,
+html[data-season="eastersunday"] .footer,
+html[data-season="thanksgiving"] .footer {
   padding-right: min(26vw, 230px);
+}
+
+.season-banner {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 640px);
+  height: auto;
+}
+
+.season-bulbs {
+  animation: season-bulb 2.4s ease-in-out infinite;
+}
+
+.season-bulbs-1 { animation-delay: -0.6s; }
+.season-bulbs-2 { animation-delay: -1.2s; }
+.season-bulbs-3 { animation-delay: -1.8s; }
+
+.season-rays {
+  animation: season-rays 4s ease-in-out infinite;
+  transform-origin: 50% 70%;
+}
+
+.season-palm {
+  transform-origin: 120px 130px;
+  animation: season-palmwave 3.6s ease-in-out infinite;
+}
+
+.season-spark {
+  animation: season-twinkle 2.6s ease-in-out infinite;
+}
+
+.season-harvest {
+  right: 8px;
+  bottom: 0;
+  width: min(26vw, 230px);
+  height: auto;
 }
 
 .season-lantern {
@@ -181,6 +223,16 @@ html[data-season="easter"] .footer {
   50% { transform: rotate(9deg); }
 }
 
+@keyframes season-rays {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes season-palmwave {
+  0%, 100% { transform: rotate(-3.5deg); }
+  50% { transform: rotate(3.5deg); }
+}
+
 @keyframes season-glow {
   0%, 100% { opacity: 0.42; }
   50% { opacity: 0.58; }
@@ -189,6 +241,11 @@ html[data-season="easter"] .footer {
 @keyframes season-starpulse {
   0%, 100% { opacity: 0.8; transform: scale(0.97); }
   50% { opacity: 1; transform: scale(1.03); }
+}
+
+@keyframes season-bulb {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 @keyframes season-swing {
@@ -217,11 +274,15 @@ html[data-season="easter"] .footer {
     right: 10px;
     width: 15vw;
   }
-  .season-crosses {
+  .season-crosses,
+  .season-harvest {
     right: 4px;
     width: 34vw;
   }
-  html[data-season="easter"] .footer {
+  html[data-season="easter"] .footer,
+  html[data-season="palmsunday"] .footer,
+  html[data-season="eastersunday"] .footer,
+  html[data-season="thanksgiving"] .footer {
     padding-right: 0;
     padding-bottom: 70px;
   }

@@ -10,7 +10,7 @@
   var root = document.documentElement;
   var KEY = 'corvidae-season';
   var NAMES = [
-    'newyear', 'valentines', 'easter', 'july4', 'halloween', 'thanksgiving', 'christmas',
+    'newyear', 'valentines', 'palmsunday', 'easter', 'eastersunday', 'july4', 'halloween', 'thanksgiving', 'christmas',
     'doubleten', 'dragonboat', 'midautumn', 'lunarnewyear', 'lanternfest', 'qixi'
   ];
 
@@ -80,16 +80,19 @@
     if (L) {
       var lny = md(y, L[0]);
       if (within(lny - 1, lny + 4)) return 'lunarnewyear';
-      if (within(md(y, L[1]) - 1, md(y, L[1]))) return 'lanternfest';
+      //if (within(md(y, L[1]) - 1, md(y, L[1]))) return 'lanternfest';
       if (within(md(y, L[2]) - 3, md(y, L[2]))) return 'dragonboat';
-      if (within(md(y, L[3]) - 1, md(y, L[3]))) return 'qixi';
+      //if (within(md(y, L[3]) - 1, md(y, L[3]))) return 'qixi';
       if (within(md(y, L[4]) - 5, md(y, L[4]))) return 'midautumn';
     }
     if (within(dn(y, 9, 5), dn(y, 9, 10))) return 'doubleten';
     if (within(dn(y, 0, 1), dn(y, 0, 3)) || within(dn(y, 11, 30), dn(y, 11, 31))) return 'newyear';
-    if (within(dn(y, 1, 7), dn(y, 1, 14))) return 'valentines';
+    // if (within(dn(y, 1, 7), dn(y, 1, 14))) return 'valentines';
     var es = easter(y);
-    if (within(es - 7, es + 1)) return 'easter';
+    // Palm Sunday shows waving palm branches, Monday to Holy Saturday the crosses, Easter Sunday and Monday the open tomb
+    if (within(es - 7, es - 7)) return 'palmsunday';
+    if (within(es - 6, es - 1)) return 'easter';
+    if (within(es, es + 1)) return 'eastersunday';
     if (within(dn(y, 6, 1), dn(y, 6, 4))) return 'july4';
     if (within(dn(y, 9, 24), dn(y, 9, 31))) return 'halloween';
     var tg = thanksgiving(y);
@@ -244,6 +247,122 @@
       cross(78, 52, 50, 6) + cross(162, 52, 50, 6) + cross(120, 34, 66, 7.5));
   }
 
+  // "HAPPY NEW YEAR" in string lights: a 5x7 dot-matrix, four bulb colours that take turns twinkling
+  function banner() {
+    var G = {
+      H: ['X...X', 'X...X', 'X...X', 'XXXXX', 'X...X', 'X...X', 'X...X'],
+      A: ['.XXX.', 'X...X', 'X...X', 'XXXXX', 'X...X', 'X...X', 'X...X'],
+      P: ['XXXX.', 'X...X', 'X...X', 'XXXX.', 'X....', 'X....', 'X....'],
+      Y: ['X...X', 'X...X', '.X.X.', '..X..', '..X..', '..X..', '..X..'],
+      N: ['X...X', 'XX..X', 'X.X.X', 'X..XX', 'X...X', 'X...X', 'X...X'],
+      E: ['XXXXX', 'X....', 'X....', 'XXXX.', 'X....', 'X....', 'XXXXX'],
+      W: ['X...X', 'X...X', 'X...X', 'X.X.X', 'X.X.X', 'XX.XX', 'X...X'],
+      R: ['XXXX.', 'X...X', 'X...X', 'XXXX.', 'X.X..', 'X..X.', 'X...X']
+    };
+    var text = 'HAPPY NEW YEAR', COLORS = ['#ffd23f', '#ff5a5f', '#f5f5f7', '#5aa0ff'];
+    var groups = ['', '', '', ''], col = 0, i, r, c, ch, g, bulb, k, P = 8;
+    for (i = 0; i < text.length; i++) {
+      ch = text.charAt(i);
+      if (ch === ' ') { col += 3; continue; }
+      g = G[ch];
+      for (r = 0; r < 7; r++) for (c = 0; c < 5; c++) {
+        if (g[r].charAt(c) !== 'X') continue;
+        k = (col + c + r * 2) % 4;
+        bulb = (col + c) * P + P / 2;
+        groups[k] += '<circle cx="' + bulb + '" cy="' + (r * P + P / 2) + '" r="' + (P * 0.6) + '" fill="' + COLORS[k] + '" opacity="0.2"/>' +
+          '<circle cx="' + bulb + '" cy="' + (r * P + P / 2) + '" r="2.5" fill="' + COLORS[k] + '"/>';
+      }
+      col += 6;
+    }
+    var width = (col - 1) * P, inner = '';
+    for (k = 0; k < 4; k++) inner += '<g class="season-bulbs season-bulbs-' + k + '">' + groups[k] + '</g>';
+    svg('season-banner', '0 0 ' + width + ' ' + (7 * P), inner);
+  }
+
+  // A harvest scene for Thanksgiving: pumpkins and wheat on a mound, bottom corner
+  function harvest() {
+    var pumpkin = function (x, y, rx, ry) {
+      return '<ellipse cx="' + x + '" cy="' + y + '" rx="' + rx + '" ry="' + ry + '" fill="#e8832a" stroke="#7a3a0e" stroke-width="1.2"/>' +
+        '<path d="M' + x + ',' + (y - ry) + ' Q' + (x - rx * 0.55) + ',' + y + ' ' + x + ',' + (y + ry) + ' M' + x + ',' + (y - ry) + ' Q' + (x + rx * 0.55) + ',' + y + ' ' + x + ',' + (y + ry) + '" fill="none" stroke="#b55a14" stroke-width="1.2"/>' +
+        '<path d="M' + (x - 1) + ',' + (y - ry) + ' q-1,-9 5,-12" fill="none" stroke="#5b4a1c" stroke-width="3" stroke-linecap="round"/>';
+    };
+    var wheat = function (x, lean) {
+      var out = '<path d="M' + x + ',130 Q' + (x + lean * 0.5) + ',90 ' + (x + lean) + ',50" fill="none" stroke="#c9a03a" stroke-width="1.8" stroke-linecap="round"/>', i, t, gx, gy;
+      for (i = 0; i < 6; i++) {
+        t = 0.5 + i * 0.1;
+        gx = x + lean * (0.55 + i * 0.09); gy = 96 - i * 8;
+        out += '<ellipse cx="' + (gx - 3) + '" cy="' + gy + '" rx="2.4" ry="5" fill="#e6bf55" stroke="#9a7420" stroke-width="0.6" transform="rotate(-24 ' + (gx - 3) + ' ' + gy + ')"/>' +
+          '<ellipse cx="' + (gx + 3) + '" cy="' + (gy - 3) + '" rx="2.4" ry="5" fill="#e6bf55" stroke="#9a7420" stroke-width="0.6" transform="rotate(24 ' + (gx + 3) + ' ' + (gy - 3) + ')"/>';
+      }
+      return out + '<ellipse cx="' + (x + lean) + '" cy="44" rx="2.4" ry="6" fill="#e6bf55" stroke="#9a7420" stroke-width="0.6"/>';
+    };
+    svg('season-harvest', '0 0 240 130',
+      '<defs><radialGradient id="hg" cx="0.5" cy="1" r="0.8"><stop offset="0" stop-color="#ffcf7a" stop-opacity="0.55"/><stop offset="0.55" stop-color="#e8a53a" stop-opacity="0.16"/><stop offset="1" stop-color="#e8a53a" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="hm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b4423"/><stop offset="1" stop-color="#33200f"/></linearGradient></defs>' +
+      '<ellipse cx="120" cy="126" rx="118" ry="100" fill="url(#hg)"/>' +
+      wheat(40, -10) + wheat(190, 10) + wheat(208, 20) +
+      '<path d="M0,130 Q20,114 60,108 Q100,100 120,100 Q150,100 190,108 Q226,114 240,130 Z" fill="url(#hm)" stroke="#a8743a" stroke-width="1.2"/>' +
+      pumpkin(104, 96, 30, 24) + pumpkin(152, 102, 20, 17) + pumpkin(66, 105, 14, 11));
+  }
+
+  // Easter morning: the tomb is open, the stone is rolled away and light pours out
+  function tomb() {
+    var rays = '', i, a, x, y, spark = '', pts = [[34, 40], [58, 18], [186, 22], [208, 46], [120, 8], [160, 36], [82, 36]];
+    for (i = -4; i <= 4; i++) {
+      a = i * 0.27;
+      x = 120 + Math.sin(a) * 96; y = 92 - Math.cos(a) * 96;
+      rays += '<polygon points="120,92 ' + (x - 8 * Math.cos(a)) + ',' + (y - 8 * Math.sin(a)) + ' ' + (x + 8 * Math.cos(a)) + ',' + (y + 8 * Math.sin(a)) + '" fill="url(#er)"/>';
+    }
+    for (i = 0; i < pts.length; i++) {
+      spark += '<path class="season-spark" style="animation-delay:-' + (i * 0.7) + 's" transform="translate(' + pts[i][0] + ' ' + pts[i][1] + ')" d="M0,-6 L1.6,-1.6 L6,0 L1.6,1.6 L0,6 L-1.6,1.6 L-6,0 L-1.6,-1.6 Z" fill="#fff4c4"/>';
+    }
+    svg('season-crosses season-empty', '0 0 240 130',
+      '<defs><radialGradient id="eg" cx="0.5" cy="0.7" r="0.6"><stop offset="0" stop-color="#fff3b0" stop-opacity="0.7"/><stop offset="0.5" stop-color="#ffd25a" stop-opacity="0.2"/><stop offset="1" stop-color="#ffd25a" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="er" gradientUnits="userSpaceOnUse" cx="120" cy="92" r="92"><stop offset="0" stop-color="#fff3b0" stop-opacity="0.6"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="eo" cx="0.5" cy="0.6" r="0.7"><stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#ffe9a0"/><stop offset="1" stop-color="#f2c250"/></radialGradient>' +
+      '<linearGradient id="ek" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c9082"/><stop offset="1" stop-color="#5a5148"/></linearGradient>' +
+      '<linearGradient id="eh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b9a5a"/><stop offset="1" stop-color="#27502f"/></linearGradient></defs>' +
+      '<ellipse cx="120" cy="100" rx="120" ry="100" fill="url(#eg)"/>' +
+      '<g class="season-rays">' + rays + '</g>' +
+      '<path d="M58,122 Q60,68 120,54 Q180,68 182,122 Z" fill="url(#ek)" stroke="#3a332c" stroke-width="1.4"/>' +
+      '<path d="M104,122 V92 Q104,76 120,76 Q136,76 136,92 V122 Z" fill="url(#eo)" stroke="#3a332c" stroke-width="1.4"/>' +
+      '<path d="M0,130 Q20,116 60,112 Q100,108 120,108 Q150,108 190,112 Q226,116 240,130 Z" fill="url(#eh)" stroke="#8fcf8c" stroke-width="1.2"/>' +
+      '<ellipse cx="82" cy="119" rx="17" ry="3.5" fill="#000" opacity="0.28"/>' +
+      '<circle cx="82" cy="104" r="16" fill="#a99f91" stroke="#3a332c" stroke-width="1.4"/>' +
+      '<path d="M71,98 Q82,90 93,98" fill="none" stroke="#d6cdbf" stroke-width="2" stroke-linecap="round"/>' +
+      '<circle cx="82" cy="104" r="10" fill="none" stroke="#7d7365" stroke-width="1"/>' +
+      '<g>' + spark + '</g>');
+  }
+
+  // Palm Sunday: three palm branches waving in the bottom corner
+  function palms() {
+    var frond = function (angle, len, delay) {
+      var P0 = [120, 130], P1 = [120 + len * 0.1, 130 - len * 0.55], P2 = [120 + len * 0.42, 130 - len];
+      var out = '', t, x, y, dx, dy, m, nx, ny, L, side, a, ca, sa, i;
+      for (i = 0; i < 14; i++) {
+        t = 0.14 + i * 0.06;
+        x = (1 - t) * (1 - t) * P0[0] + 2 * (1 - t) * t * P1[0] + t * t * P2[0];
+        y = (1 - t) * (1 - t) * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1];
+        dx = 2 * (1 - t) * (P1[0] - P0[0]) + 2 * t * (P2[0] - P1[0]);
+        dy = 2 * (1 - t) * (P1[1] - P0[1]) + 2 * t * (P2[1] - P1[1]);
+        m = Math.sqrt(dx * dx + dy * dy); dx /= m; dy /= m;
+        L = 30 * (1 - 0.55 * t);
+        for (side = -1; side <= 1; side += 2) {
+          a = side * 0.95; ca = Math.cos(a); sa = Math.sin(a);
+          nx = dx * ca - dy * sa; ny = dx * sa + dy * ca;
+          out += '<path d="M' + x.toFixed(1) + ',' + y.toFixed(1) + ' Q' + (x + nx * L * 0.5 + dx * 4).toFixed(1) + ',' + (y + ny * L * 0.5 + dy * 4 + 3).toFixed(1) + ' ' + (x + nx * L).toFixed(1) + ',' + (y + ny * L + 7).toFixed(1) + '" fill="none" stroke="' + (i % 2 ? '#3f9b4a' : '#58b862') + '" stroke-width="3.4" stroke-linecap="round"/>';
+        }
+      }
+      out += '<path d="M' + P0[0] + ',' + P0[1] + ' Q' + P1[0] + ',' + P1[1] + ' ' + P2[0] + ',' + P2[1] + '" fill="none" stroke="#9bd88f" stroke-width="2.4" stroke-linecap="round"/>';
+      return '<g class="season-palm" style="animation-delay:-' + delay + 's"><g transform="rotate(' + angle + ' 120 130)">' + out + '</g></g>';
+    };
+    svg('season-crosses season-palms', '0 0 240 130',
+      '<defs><radialGradient id="pg" cx="0.5" cy="1" r="0.8"><stop offset="0" stop-color="#d8f5a0" stop-opacity="0.5"/><stop offset="0.55" stop-color="#7ddc8a" stop-opacity="0.16"/><stop offset="1" stop-color="#7ddc8a" stop-opacity="0"/></radialGradient></defs>' +
+      '<ellipse cx="120" cy="126" rx="118" ry="100" fill="url(#pg)"/>' +
+      frond(-38, 100, 0) + frond(36, 100, 1.3) + frond(-4, 108, 2.4) +
+      '<rect x="112" y="116" width="16" height="9" rx="3" fill="#c9a03a" stroke="#7a5a14" stroke-width="1"/>');
+  }
+
   function mountScenery() {
     unmountScenery();
     if (season === 'doubleten') tower();
@@ -252,6 +371,10 @@
     else if (season === 'lunarnewyear') lanterns();
     else if (season === 'christmas') star();
     else if (season === 'easter') crosses();
+    else if (season === 'palmsunday') palms();
+    else if (season === 'eastersunday') tomb();
+    else if (season === 'newyear') banner();
+    else if (season === 'thanksgiving') harvest();
     var g = document.getElementById('season-greeting');
     if (g) {
       g.textContent = GREETING[season] || '';
@@ -271,6 +394,8 @@
   // ---------- falling things ----------
   var canvas = null, ctx = null, parts = [], raf = 0, last = 0, w = 0, h = 0, dpr = 1, running = false;
   var slow = 0, throttled = false, nextBurst = 0, nextStar = 2, tsec = 0;
+  // These seasons are decoration only, so no canvas is needed
+  var NOCANVAS = { easter: 1, palmsunday: 1, eastersunday: 1, dragonboat: 1, thanksgiving: 1 };
   var rm = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -282,6 +407,7 @@
   var HEART = ['#ff7eb6', '#ff5a8a', '#ffa3c7', '#e8456f'];
   var SPARK = ['#ff5a5f', '#f5f5f7', '#5aa0ff'];
   var TW_SPARK = ['#ff5a5f', '#f5f5f7', '#5aa0ff', '#f2c94c'];
+  var LNY_SPARK = ['#ff4d4d', '#ffcc4d', '#ff9a3c', '#fff4c9'];
   var PAPER = ['#e8503a', '#ff9a3c', '#d62f2f', '#ffb347'];
 
   function count() {
@@ -351,7 +477,7 @@
 
   function fill() {
     parts = [];
-    if (season === 'july4' || season === 'doubleten') return;
+    if (season === 'july4' || season === 'doubleten' || season === 'lunarnewyear') return;
     var n = count();
     if (season === 'midautumn' || season === 'lanternfest') n = Math.max(8, Math.round(n * 0.4));
     if (season === 'qixi') n = Math.round(n * 1.2);
@@ -429,6 +555,9 @@
     ctx.clearRect(0, 0, w, h);
     if (season === 'july4' && tsec > nextBurst && parts.length < 260) {
       burst(rnd(w * 0.12, w * 0.88), rnd(h * 0.1, h * 0.5), SPARK, 26); nextBurst = tsec + rnd(0.9, 1.8);
+    }
+    if (season === 'lunarnewyear' && tsec > nextBurst && parts.length < 260) {
+      burst(rnd(w * 0.12, w * 0.88), rnd(h * 0.1, h * 0.5), LNY_SPARK, 28); nextBurst = tsec + rnd(0.9, 1.8);
     }
     if (season === 'doubleten' && tsec > nextBurst && parts.length < 320) { rocket(); nextBurst = tsec + rnd(0.5, 1.2); }
     if (season === 'qixi' && tsec > nextStar) {
@@ -518,7 +647,7 @@
   }
 
   function start() {
-    if (running || (rm && rm.matches) || document.hidden) return;
+    if (running || NOCANVAS[season] || (rm && rm.matches) || document.hidden) return;
     if (!canvas) {
       canvas = document.createElement('canvas');
       canvas.className = 'season-canvas';
