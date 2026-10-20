@@ -145,10 +145,10 @@ const universeRows = [
       </div>
 
       <div class="fixture-head" aria-hidden="true">
-        <span>Fixture</span><span>Channels</span><span>Watts</span><span>Qty</span><span></span>
+        <span>Fixture</span><span>Channels</span><span>Watts</span><span>Qty</span><span>Start (optional)</span><span>Zone (optional)</span><span></span>
       </div>
       <div id="fixture-list"></div>
-      <p class="hint" style="margin: 12px 0 0;">Channels is the fixture's DMX mode (for example 7CH or 36CH), shown in its menu or manual, not the number of lamps. Watts is what one fixture draws, from its label or spec sheet; it feeds the Power tab and isn't used for addressing.</p>
+      <p class="hint" style="margin: 12px 0 0;">Channels is the fixture's DMX mode (for example 7CH or 36CH), shown in its menu or manual, not the number of lamps. Watts is what one fixture draws, from its label or spec sheet; it feeds the Power tab and isn't used for addressing. Start is optional: type a universe and address such as <code>5.1</code> to begin that fixture group there (for example, to give a group its own node output), or leave it blank to continue after the previous group. Zone is also optional: name where that group hangs (Catwalk 1, Floor, Stage Right Floor). The Power tab never puts fixtures from different zones on the same circuit.</p><datalist id="zone-list"></datalist>
 
       <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 32px;">
         <button type="button" id="p-add" class="btn-primary">Add fixture</button>
@@ -158,6 +158,17 @@ const universeRows = [
 
       <p id="p-summary" class="summary" style="margin-top: 0;"></p>
       <p id="p-warning" class="warning" style="display: none;"></p>
+
+      <div id="p-universes" class="results patch-results" style="margin-top: 20px; display: none;">
+        <div class="scroll">
+          <table class="stack">
+            <thead class="stack-head">
+              <tr><th>Universe</th><th>Channels used</th><th>Free</th><th>Contains</th></tr>
+            </thead>
+            <tbody id="p-ubody"></tbody>
+          </table>
+        </div>
+      </div>
 
       <div id="p-output" class="results patch-results" style="margin-top: 20px;">
         <div class="scroll">
@@ -174,6 +185,37 @@ const universeRows = [
   </div>
 
   <div id="panel-power" role="tabpanel" aria-labelledby="tab-power" hidden>
+    <section class="section">
+      <h2>Fixtures per circuit</h2>
+      <p class="hint">A quick check for one fixture type: how many fit on a 15, 20 or 30 A circuit, loaded to 80% of the breaker rating. For a whole rig, use the estimate below.</p>
+      <div class="row">
+        <div>
+          <label for="c-watts">Watts each</label>
+          <input type="number" id="c-watts" class="field" min="1" max="50000" step="any" placeholder="145" style="width: 120px;" />
+        </div>
+        <div>
+          <label for="c-qty">How many (optional)</label>
+          <input type="number" id="c-qty" class="field" min="1" max="5000" step="1" placeholder="8" style="width: 120px;" />
+        </div>
+        <div>
+          <label for="c-pf">Power factor</label>
+          <input type="number" id="c-pf" class="field" min="0.5" max="1" step="0.01" value="0.9" style="width: 120px;" />
+        </div>
+      </div>
+      <p id="c-note" class="warning" style="display: none;"></p>
+      <div id="c-output" class="results patch-results" style="margin-top: 20px; max-width: 760px; display: none;">
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr><th>Breaker</th><th>Usable</th><th>Fit on one circuit</th><th>Circuits needed</th><th>Busiest circuit</th></tr>
+            </thead>
+            <tbody id="c-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="hint" style="margin-top: 12px;">Use a power factor of 1.0 for incandescent or tungsten and 0.9&ndash;0.95 for most LED fixtures. If the wattage you entered is already VA, 1.0 is right.</p>
+    </section>
+
     <section class="section">
       <h2>Power estimate</h2>
       <p class="hint">Uses the fixture list from the Patch planner, so enter each fixture&rsquo;s Watts there. Fixtures are packed onto circuits one by one, because a fixture can&rsquo;t be split across two breakers.</p>
@@ -202,7 +244,10 @@ const universeRows = [
       </div>
       <p class="hint">Circuits are loaded to 80% of the breaker rating (the continuous-load rule), and this can&rsquo;t be changed. Power factor turns watts into volt-amps, which is what the breaker actually sees. Use 1.0 for incandescent or tungsten; LED drivers are often 0.9&ndash;0.95, so check the spec sheet. If your fixture figures are already in VA, a lower power factor only adds safety margin. Everything is on 120 V circuits; 208 V fixtures aren&rsquo;t modelled.</p>
 
-      <p id="w-empty" class="summary" style="display: none;">Enter Watts for at least one fixture in the Patch planner to see the power estimate.</p>
+      <div id="w-empty" style="display: none;">
+        <p class="summary">Enter Watts for at least one fixture in the Patch planner to see the power estimate.</p>
+        <button type="button" id="w-goto" class="btn-secondary">Open Patch planner</button>
+      </div>
       <p id="w-warning" class="warning" style="display: none;"></p>
 
       <div id="w-output">
@@ -227,9 +272,9 @@ const universeRows = [
 
         <div class="results patch-results" style="margin-top: 20px;">
           <div class="scroll">
-            <table>
-              <thead>
-                <tr><th>Circuit</th><th>Load</th><th>Current</th><th>Of usable</th><th>On this circuit</th></tr>
+            <table class="stack">
+              <thead class="stack-head">
+                <tr><th>Circuit</th><th id="w-zone-th">Zone</th><th>Load</th><th>Current</th><th>Of usable</th><th>On this circuit</th></tr>
               </thead>
               <tbody id="w-body"></tbody>
             </table>
@@ -448,10 +493,10 @@ const universeRows = [
   .fixture-head,
   #fixture-list :global(.fixture-row) {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) 110px 100px 90px 40px;
+    grid-template-columns: minmax(130px, 1fr) 100px 90px 80px 110px 150px 40px;
     gap: 12px;
     align-items: center;
-    max-width: 760px;
+    max-width: 1000px;
   }
   .fixture-head {
     font-family: var(--font-mono);
@@ -519,16 +564,22 @@ const universeRows = [
     white-space: nowrap;
   }
   #p-body :global(tr),
+  #c-body :global(tr),
+  #p-ubody :global(tr),
   #w-body :global(tr),
   #w-phase-body :global(tr) {
     border-bottom: 1px solid var(--border);
   }
   #p-body :global(tr:last-child),
+  #c-body :global(tr:last-child),
+  #p-ubody :global(tr:last-child),
   #w-body :global(tr:last-child),
   #w-phase-body :global(tr:last-child) {
     border-bottom: none;
   }
   #p-body :global(td),
+  #c-body :global(td),
+  #p-ubody :global(td),
   #w-body :global(td),
   #w-phase-body :global(td) {
     padding: 10px 20px;
@@ -538,6 +589,8 @@ const universeRows = [
     white-space: nowrap;
   }
   #p-body :global(td:first-child),
+  #c-body :global(td:first-child),
+  #p-ubody :global(td:first-child),
   #w-body :global(td:first-child),
   #w-phase-body :global(td:first-child) {
     color: var(--text);
@@ -581,7 +634,24 @@ const universeRows = [
     border: 1px solid #e0b374;
     border-radius: 8px;
   }
+  #c-body :global(td.addr) {
+    color: var(--text);
+    font-weight: 700;
+  }
+  #c-body :global(td.over) {
+    color: #e0b374;
+    font-weight: 700;
+    white-space: normal;
+  }
   #w-body :global(td.over) {
+    color: #e0b374;
+    font-weight: 700;
+  }
+  #p-ubody :global(td.contents) {
+    white-space: normal;
+    min-width: 200px;
+  }
+  #p-ubody :global(td.full) {
     color: #e0b374;
     font-weight: 700;
   }
@@ -598,6 +668,62 @@ const universeRows = [
   }
 
   @media (max-width: 560px) {
+    /* column headers stay for screen readers while rows are shown as cards */
+    .stack-head {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    table.stack,
+    table.stack tbody {
+      display: block;
+      width: 100%;
+    }
+    #p-ubody :global(tr),
+    #w-body :global(tr) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 16px;
+      padding: 12px 16px;
+    }
+    #p-ubody :global(td),
+    #w-body :global(td) {
+      display: block;
+      padding: 0;
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    #p-ubody :global(td::before),
+    #w-body :global(td::before) {
+      content: attr(data-label);
+      display: block;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 2px;
+    }
+    /* the first cell is the card title: "Universe 2", "Circuit 3" */
+    #p-ubody :global(td:first-child),
+    #w-body :global(td:first-child) {
+      grid-column: 1 / -1;
+    }
+    #p-ubody :global(td:first-child::before),
+    #w-body :global(td:first-child::before) {
+      content: attr(data-label) ' ';
+      display: inline;
+      font-size: inherit;
+      color: inherit;
+      margin: 0;
+    }
+    #p-ubody :global(td.contents),
+    #w-body :global(td.contents),
+    #w-body :global(td[data-label='Zone']),
+    #w-body :global(td[data-label='Load']) {
+      grid-column: 1 / -1;
+    }
     /* two rows per fixture: name + remove, then channels / watts / qty with small labels */
     .fixture-head {
       display: none;
@@ -612,6 +738,12 @@ const universeRows = [
       grid-column: 1 / 4;
     }
     #fixture-list :global(.fixture-row > :nth-child(5)) {
+      grid-column: 1;
+    }
+    #fixture-list :global(.fixture-row > :nth-child(6)) {
+      grid-column: 2 / 5;
+    }
+    #fixture-list :global(.fixture-row > :nth-child(7)) {
       grid-column: 4;
       grid-row: 1;
     }
@@ -790,13 +922,13 @@ const universeRows = [
   showTab(location.hash === '#patch' ? 1 : location.hash === '#power' ? 2 : 0, false);
 
   // ---------- Patch planner ----------
-  type Fixture = { name: string; channels: number; qty: number; watts: number };
+  type Fixture = { name: string; channels: number; qty: number; watts: number; start: string; zone: string };
 
   const STORAGE_KEY = 'bluejay-patch-v1';
   const EXAMPLE: Fixture[] = [
-    { name: 'Moving head', channels: 16, qty: 8, watts: 350 },
-    { name: 'LED par', channels: 7, qty: 24, watts: 80 },
-    { name: 'LED batten', channels: 36, qty: 7, watts: 120 }
+    { name: 'Moving head', channels: 16, qty: 8, watts: 350, start: '', zone: '' },
+    { name: 'LED par', channels: 7, qty: 24, watts: 80, start: '', zone: '' },
+    { name: 'LED batten', channels: 36, qty: 7, watts: 120, start: '', zone: '' }
   ];
 
   const fixtureList = document.getElementById('fixture-list') as HTMLDivElement;
@@ -807,6 +939,8 @@ const universeRows = [
   const pWarning = document.getElementById('p-warning') as HTMLParagraphElement;
   const pOutput = document.getElementById('p-output') as HTMLDivElement;
   const pBody = document.getElementById('p-body') as HTMLTableSectionElement;
+  const pUniverses = document.getElementById('p-universes') as HTMLDivElement;
+  const pUBody = document.getElementById('p-ubody') as HTMLTableSectionElement;
 
   // power tab controls (read by loadFixtures, so declared first)
   const wPhase = document.getElementById('w-phase') as HTMLSelectElement;
@@ -835,7 +969,10 @@ const universeRows = [
             name: typeof f.name === 'string' ? f.name : '',
             channels: Number(f.channels),
             qty: Number(f.qty),
-            watts: Number(f.watts) > 0 ? Number(f.watts) : 0
+            watts: Number(f.watts) > 0 ? Number(f.watts) : 0,
+            // lists saved before per-group starts have none; blank means continue from the previous group
+            start: typeof f.start === 'string' ? f.start : '',
+            zone: typeof f.zone === 'string' ? f.zone : ''
           }));
         }
       }
@@ -890,6 +1027,48 @@ const universeRows = [
     return wrap;
   }
 
+  // optional "universe.address" start for a fixture group, with the same small phone-only caption as the number fields
+  function makeStartInput(f: Fixture, n: number) {
+    const input = makeInput('text', f.start, `Fixture ${n} start, universe and address such as 5.1 (optional)`, (v) => { f.start = v; recalc(); }) as HTMLInputElement;
+    input.placeholder = 'auto';
+    input.maxLength = 12;
+    input.inputMode = 'decimal';
+    const wrap = document.createElement('label');
+    wrap.className = 'num-label';
+    const cap = document.createElement('span');
+    cap.textContent = 'Start (optional)';
+    cap.setAttribute('aria-hidden', 'true');
+    wrap.append(cap, input);
+    return wrap;
+  }
+
+  // optional power zone for a fixture group; the Power tab keeps different zones on separate circuits
+  function makeZoneInput(f: Fixture, n: number) {
+    const input = makeInput('text', f.zone, `Fixture ${n} power zone, for example Catwalk 1 (optional)`, (v) => { f.zone = v; recalc(); }) as HTMLInputElement;
+    input.placeholder = 'none';
+    input.maxLength = 40;
+    input.setAttribute('list', 'zone-list');
+    const wrap = document.createElement('label');
+    wrap.className = 'num-label';
+    const cap = document.createElement('span');
+    cap.textContent = 'Zone (optional)';
+    cap.setAttribute('aria-hidden', 'true');
+    wrap.append(cap, input);
+    return wrap;
+  }
+
+  // "5", "5.1", "5/1" or "5:1" -> universe and address; blank means continue from the previous group
+  function parseStart(raw: string): { u: number; a: number } | null | 'bad' {
+    const s = raw.trim();
+    if (!s) return null;
+    const m = /^(\d{1,5})(?:\s*[./:]\s*(\d{1,3}))?$/.exec(s);
+    if (!m) return 'bad';
+    const u = Number(m[1]);
+    const a = m[2] === undefined ? 1 : Number(m[2]);
+    if (u < 1 || u > 63999 || a < 1 || a > 512) return 'bad';
+    return { u, a };
+  }
+
   function renderFixtureRows() {
     fixtureList.innerHTML = '';
     fixtures.forEach((f, i) => {
@@ -900,7 +1079,9 @@ const universeRows = [
         makeInput('text', f.name, `Fixture ${n} name`, (v) => { f.name = v; recalc(); }),
         makeInput('number', String(f.channels), `Fixture ${n} channels`, (v) => { f.channels = Math.floor(Number(v)); recalc(); }, { min: '1', max: '512', short: 'Channels' }),
         makeInput('number', f.watts > 0 ? String(f.watts) : '', `Fixture ${n} watts each`, (v) => { f.watts = Number(v) > 0 ? Number(v) : 0; recalc(); }, { min: '0', max: '50000', step: 'any', short: 'Watts' }),
-        makeInput('number', String(f.qty), `Fixture ${n} quantity`, (v) => { f.qty = Math.floor(Number(v)); recalc(); }, { min: '1', max: '2000', short: 'Qty' })
+        makeInput('number', String(f.qty), `Fixture ${n} quantity`, (v) => { f.qty = Math.floor(Number(v)); recalc(); }, { min: '1', max: '2000', short: 'Qty' }),
+        makeStartInput(f, n),
+        makeZoneInput(f, n)
       );
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -917,7 +1098,7 @@ const universeRows = [
     });
   }
 
-  type Patched = { label: string; universe: number; address: number; end: number; endUniverse: number; channels: number; watts: number };
+  type Patched = { label: string; group: string; zone: string; universe: number; address: number; end: number; endUniverse: number; channels: number; watts: number };
 
   function dipOn(address: number): string {
     const total = address - offset();
@@ -929,16 +1110,40 @@ const universeRows = [
 
   let lastPatch: Patched[] = [];
 
+  const zoneList = document.getElementById('zone-list') as HTMLDataListElement;
+
+  // copies each column header onto its cells, so the phone layout can caption them (hidden columns are skipped)
+  function labelCells(body: HTMLTableSectionElement) {
+    const head = body.closest('table')?.tHead?.rows[0];
+    const names = head ? [...head.cells].filter((th) => th.style.display !== 'none').map((th) => th.textContent ?? '') : [];
+    body.querySelectorAll('tr').forEach((tr) => {
+      [...tr.children].forEach((td, i) => ((td as HTMLElement).dataset.label = names[i] ?? ''));
+    });
+  }
+
   function recalc() {
     saveFixtures();
+    zoneList.innerHTML = '';
+    const seenZones = new Set<string>();
+    for (const z of fixtures.map((f) => f.zone.trim()).filter(Boolean)) {
+      if (seenZones.has(z.toLowerCase())) continue;
+      seenZones.add(z.toLowerCase());
+      const o = document.createElement('option');
+      o.value = z;
+      zoneList.appendChild(o);
+    }
     const warnings: string[] = [];
     let universe = Math.max(1, Math.floor(Number(pStartU.value)) || 1);
     let address = Math.min(512, Math.max(1, Math.floor(Number(pStartA.value)) || 1));
     const allowSplit = pSplit.value === 'yes';
-    const firstUniverse = universe;
     let used = 0;
     let wasted = 0;
     const out: Patched[] = [];
+    // which channels are taken in each universe, and by which fixture group, to flag two groups sharing channels
+    const taken = new Map<number, Uint8Array>();
+    const owner = new Map<number, string[]>();
+    const overlaps = new Set<string>();
+    const contents = new Map<number, Map<string, number>>();
 
     for (const f of fixtures) {
       const ch = f.channels;
@@ -955,9 +1160,20 @@ const universeRows = [
       if (qty > 2000) {
         warnings.push(`${name}: quantity capped at 2,000.`);
       }
+      const start = parseStart(f.start);
+      if (start === 'bad') {
+        warnings.push(`${name}: start \u201c${f.start.trim()}\u201d isn\u2019t a universe and address like 5.1, so it continues after the previous group.`);
+      } else if (start) {
+        universe = start.u;
+        address = start.a;
+      }
       for (let n = 1; n <= Math.min(qty, 2000); n++) {
         if (!allowSplit && address + ch - 1 > 512) {
-          wasted += 513 - address;
+          if (n === 1 && start && start !== 'bad') {
+            warnings.push(`${name} doesn\u2019t fit at ${start.u}.${start.a}, so it starts at ${universe + 1}.1.`);
+          } else {
+            wasted += 513 - address;
+          }
           universe++;
           address = 1;
         }
@@ -966,8 +1182,30 @@ const universeRows = [
         const absEnd = (universe - 1) * 512 + address + ch - 1;
         const endU = Math.floor((absEnd - 1) / 512) + 1;
         const endA = ((absEnd - 1) % 512) + 1;
-        out.push({ label: qty > 1 ? `${name} ${n}` : name, universe: startU, address: startA, end: endA, endUniverse: endU, channels: ch, watts: f.watts });
+        out.push({ label: qty > 1 ? `${name} ${n}` : name, group: name, zone: f.zone.trim(), universe: startU, address: startA, end: endA, endUniverse: endU, channels: ch, watts: f.watts });
         used += ch;
+        // mark each channel this fixture takes
+        for (let c = (startU - 1) * 512 + startA; c <= absEnd; c++) {
+          const cu = Math.floor((c - 1) / 512) + 1;
+          const ca = ((c - 1) % 512) + 1;
+          let slots = taken.get(cu);
+          let who = owner.get(cu);
+          if (!slots || !who) {
+            slots = new Uint8Array(513);
+            who = new Array<string>(513).fill('');
+            taken.set(cu, slots);
+            owner.set(cu, who);
+          }
+          if (slots[ca] && who[ca] !== name) overlaps.add(`${who[ca]}|${name}|${cu}`);
+          slots[ca] = 1;
+          who[ca] = name;
+        }
+        let inU = contents.get(startU);
+        if (!inU) {
+          inU = new Map<string, number>();
+          contents.set(startU, inU);
+        }
+        inU.set(name, (inU.get(name) ?? 0) + 1);
         universe = endA === 512 ? endU + 1 : endU;
         address = endA === 512 ? 1 : endA + 1;
       }
@@ -998,8 +1236,35 @@ const universeRows = [
       pBody.appendChild(tr);
     }
 
-    const lastU = out.length ? out[out.length - 1].endUniverse : firstUniverse;
-    const universes = out.length ? lastU - firstUniverse + 1 : 0;
+    const universes = taken.size;
+    for (const key of overlaps) {
+      const [a, b, u] = key.split('|');
+      warnings.push(`${a} and ${b} overlap in universe ${u}: the same channels are patched twice.`);
+    }
+    // one row per universe in use: how full it is and which groups are in it
+    pUBody.innerHTML = '';
+    for (const u of [...taken.keys()].sort((x, y) => x - y)) {
+      const slots = taken.get(u) as Uint8Array;
+      let count = 0;
+      for (let a = 1; a <= 512; a++) if (slots[a]) count++;
+      const tr = document.createElement('tr');
+      const groups = [...(contents.get(u) ?? new Map<string, number>())].map(([g, k]) => (k > 1 ? `${g} \u00d7${k}` : g));
+      const cells: [string, string?][] = [
+        [String(u), 'addr'],
+        [`${count} / 512`, count === 512 ? 'full' : undefined],
+        [String(512 - count)],
+        [groups.join(', ') || '(continued from the previous universe)', 'contents']
+      ];
+      for (const [text, cls] of cells) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (cls) td.className = cls;
+        tr.appendChild(td);
+      }
+      pUBody.appendChild(tr);
+    }
+    labelCells(pUBody);
+    pUniverses.style.display = out.length ? 'block' : 'none';
     pOutput.style.display = out.length ? 'block' : 'none';
     pSummary.textContent = out.length
       ? `${out.length} fixture${out.length === 1 ? '' : 's'}, ${used.toLocaleString()} channels across ${universes} universe${universes === 1 ? '' : 's'}` +
@@ -1024,7 +1289,7 @@ const universeRows = [
 
   // ---------- Power ----------
   const wOutput = document.getElementById('w-output') as HTMLDivElement;
-  const wEmpty = document.getElementById('w-empty') as HTMLParagraphElement;
+  const wEmpty = document.getElementById('w-empty') as HTMLDivElement;
   const wWarning = document.getElementById('w-warning') as HTMLParagraphElement;
   const wTotals = document.getElementById('w-totals') as HTMLTableSectionElement;
   const wPhaseBox = document.getElementById('w-phase-box') as HTMLDivElement;
@@ -1032,6 +1297,7 @@ const universeRows = [
   const wBalance = document.getElementById('w-balance') as HTMLParagraphElement;
   const wThreeNote = document.getElementById('w-three-note') as HTMLParagraphElement;
   const wBody = document.getElementById('w-body') as HTMLTableSectionElement;
+  const wZoneTh = document.getElementById('w-zone-th') as HTMLTableCellElement;
 
   const LEG_VOLTS = 120; // every circuit is 120 V single-pole
   const LINE_VOLTS = 208; // 120/208 V wye
@@ -1040,7 +1306,7 @@ const universeRows = [
 
   const fmt = (n: number, digits = 0) => n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-  type Circuit = { va: number; w: number; counts: Map<string, number>; phase: number };
+  type Circuit = { va: number; w: number; counts: Map<string, number>; phase: number; zone: string; zi: number };
 
   function addRow(body: HTMLTableSectionElement, cells: [string, string?][]) {
     const tr = document.createElement('tr');
@@ -1065,7 +1331,7 @@ const universeRows = [
     const capVA = LEG_VOLTS * breaker * USABLE_FRACTION;
 
     // one entry per physical fixture
-    const units: { name: string; w: number; va: number }[] = [];
+    const units: { name: string; w: number; va: number; zone: string }[] = [];
     const noWatts: string[] = [];
     let capped = false;
     for (const f of fixtures) {
@@ -1080,7 +1346,7 @@ const universeRows = [
           capped = true;
           break;
         }
-        units.push({ name, w: f.watts, va: f.watts / pf });
+        units.push({ name, w: f.watts, va: f.watts / pf, zone: f.zone.trim() });
       }
     }
     if (noWatts.length) {
@@ -1106,21 +1372,36 @@ const universeRows = [
     wEmpty.style.display = 'none';
     wOutput.style.display = 'block';
 
-    // first-fit decreasing: biggest fixtures first, each onto the first circuit with room
-    units.sort((a, b) => b.va - a.va);
+    // first-fit decreasing within each zone: biggest fixtures first, each onto the first circuit in its zone with room.
+    // Fixtures in different zones never share a circuit; fixtures with no zone are packed together.
+    const byZone = new Map<string, typeof units>();
+    for (const u of units) {
+      const key = u.zone.toLowerCase();
+      const list = byZone.get(key);
+      if (list) list.push(u);
+      else byZone.set(key, [u]);
+    }
     const circuits: Circuit[] = [];
     let oversize = 0;
-    for (const u of units) {
-      let c: Circuit | undefined;
-      if (u.va <= capVA) c = circuits.find((x) => x.va + u.va <= capVA + 1e-9);
-      else oversize++;
-      if (!c) {
-        c = { va: 0, w: 0, counts: new Map(), phase: 0 };
-        circuits.push(c);
+    let zi = 0;
+    for (const list of byZone.values()) {
+      const zoneName = list[0].zone; // as first typed, before sorting
+      list.sort((a, b) => b.va - a.va);
+      const zoneCircuits: Circuit[] = [];
+      for (const u of list) {
+        let c: Circuit | undefined;
+        if (u.va <= capVA) c = zoneCircuits.find((x) => x.va + u.va <= capVA + 1e-9);
+        else oversize++;
+        if (!c) {
+          c = { va: 0, w: 0, counts: new Map(), phase: 0, zone: zoneName, zi };
+          zoneCircuits.push(c);
+        }
+        c.va += u.va;
+        c.w += u.w;
+        c.counts.set(u.name, (c.counts.get(u.name) ?? 0) + 1);
       }
-      c.va += u.va;
-      c.w += u.w;
-      c.counts.set(u.name, (c.counts.get(u.name) ?? 0) + 1);
+      circuits.push(...zoneCircuits);
+      zi++;
     }
     if (oversize) {
       warnings.push(`${oversize} fixture${oversize === 1 ? '' : 's'} draw${oversize === 1 ? 's' : ''} more than one ${breaker} A circuit can carry (${fmt(capVA)} VA usable). Each sits alone on an overloaded circuit below; use a bigger circuit or a different supply for ${oversize === 1 ? 'it' : 'them'}.`);
@@ -1141,7 +1422,7 @@ const universeRows = [
         phaseW[lightest] += c.w;
         phaseCount[lightest]++;
       }
-      circuits.sort((a, b) => a.phase - b.phase || b.va - a.va);
+      circuits.sort((a, b) => a.phase - b.phase || a.zi - b.zi || b.va - a.va);
     }
 
     addRow(wTotals, [['Real power', ''], [`${fmt(totalW)} W`]]);
@@ -1170,6 +1451,8 @@ const universeRows = [
       wBalance.textContent = `Circuits are spread across L1, L2 and L3, heaviest first. The busiest phase is ${fmt(pct)}% above the average.`;
     }
 
+    const hasZones = circuits.some((c) => c.zone);
+    wZoneTh.style.display = hasZones ? '' : 'none';
     const perPhase = [0, 0, 0];
     for (const c of circuits) {
       const idx = threePhase ? ++perPhase[c.phase] : perPhase[0] + 1;
@@ -1178,14 +1461,17 @@ const universeRows = [
       const percent = (c.va / capVA) * 100;
       const over = c.va > capVA + 1e-9;
       const contents = [...c.counts].map(([n, k]) => (k > 1 ? `${n} \u00d7${k}` : n)).join(', ');
+      const zoneCell: [string, string?][] = hasZones ? [[c.zone || '\u2014']] : [];
       addRow(wBody, [
         [label, 'addr'],
+        ...zoneCell,
         [`${fmt(c.w)} W / ${fmt(c.va)} VA`],
         [`${fmt(c.va / LEG_VOLTS, 1)} A`],
         [over ? `${fmt(percent, 1)}% OVER` : `${fmt(percent, 1)}%`, over ? 'over' : undefined],
         [contents, 'contents']
       ]);
     }
+    labelCells(wBody);
 
     if (warnings.length) {
       wWarning.textContent = warnings.join(' ');
@@ -1193,15 +1479,61 @@ const universeRows = [
     }
   }
 
+  // ---------- Fixtures per circuit ----------
+  const cWatts = document.getElementById('c-watts') as HTMLInputElement;
+  const cQty = document.getElementById('c-qty') as HTMLInputElement;
+  const cPf = document.getElementById('c-pf') as HTMLInputElement;
+  const cNote = document.getElementById('c-note') as HTMLParagraphElement;
+  const cOutput = document.getElementById('c-output') as HTMLDivElement;
+  const cBody = document.getElementById('c-body') as HTMLTableSectionElement;
+
+  function recalcCircuitCalc() {
+    const watts = Number(cWatts.value);
+    cBody.innerHTML = '';
+    cNote.style.display = 'none';
+    if (!(watts > 0)) {
+      cOutput.style.display = 'none';
+      return;
+    }
+    let pf = Number(cPf.value);
+    if (!(pf >= 0.5 && pf <= 1)) {
+      cNote.textContent = 'Power factor must be between 0.5 and 1.0, so 0.9 is being used.';
+      cNote.style.display = 'block';
+      pf = 0.9;
+    }
+    const qtyRaw = Math.floor(Number(cQty.value));
+    const qty = qtyRaw >= 1 ? Math.min(qtyRaw, 5000) : 0;
+    const va = watts / pf;
+    for (const breaker of [15, 20, 30]) {
+      const cap = LEG_VOLTS * breaker * USABLE_FRACTION;
+      const per = Math.floor(cap / va + 1e-9);
+      if (per < 1) {
+        addRow(cBody, [[`${breaker} A`, 'addr'], [`${fmt(cap)} VA`], ['None: one fixture is over the limit', 'over'], ['\u2014'], ['\u2014']]);
+        continue;
+      }
+      const busiest = Math.min(per, qty || per);
+      addRow(cBody, [
+        [`${breaker} A`, 'addr'],
+        [`${fmt(cap)} VA`],
+        [`${fmt(per)}`, 'addr'],
+        [qty ? String(Math.ceil(qty / per)) : '\u2014'],
+        [`${fmt((busiest * va / cap) * 100, 1)}%`]
+      ]);
+    }
+    cOutput.style.display = 'block';
+  }
+  [cWatts, cQty, cPf].forEach((el) => el.addEventListener('input', recalcCircuitCalc));
+  (document.getElementById('w-goto') as HTMLButtonElement).addEventListener('click', () => showTab(1, true));
+
   [wPhase, wBreaker].forEach((el) => el.addEventListener('change', () => { saveFixtures(); recalcPower(); }));
   wPf.addEventListener('input', () => { saveFixtures(); recalcPower(); });
 
   (document.getElementById('p-csv') as HTMLButtonElement).addEventListener('click', () => {
-    const header = ['Fixture', 'Universe', 'Start address', 'End universe', 'End address', 'Channels', 'Console', 'Absolute start', 'DIP switches on', 'Watts each'];
+    const header = ['Fixture', 'Universe', 'Start address', 'End universe', 'End address', 'Channels', 'Console', 'Absolute start', 'DIP switches on', 'Watts each', 'Zone'];
     const lines = [header.join(',')];
     for (const p of lastPatch) {
       lines.push(
-        [p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address), p.watts > 0 ? p.watts : '']
+        [p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address), p.watts > 0 ? p.watts : '', p.zone]
           .map(csvCell)
           .join(',')
       );
@@ -1216,7 +1548,7 @@ const universeRows = [
   });
 
   (document.getElementById('p-add') as HTMLButtonElement).addEventListener('click', () => {
-    fixtures.push({ name: '', channels: 1, qty: 1, watts: 0 });
+    fixtures.push({ name: '', channels: 1, qty: 1, watts: 0, start: '', zone: '' });
     renderFixtureRows();
     recalc();
     const inputs = fixtureList.querySelectorAll<HTMLInputElement>('.fixture-row:last-child input');
