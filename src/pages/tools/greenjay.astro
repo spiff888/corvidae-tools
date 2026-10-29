@@ -1,0 +1,695 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Green Jay — camera storage & bandwidth calculator — corvidae.tools" description="Estimate IP camera storage, retention, RAID drive counts and network bandwidth for a surveillance system, entirely in your browser.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Green Jay</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Cyanocorax yncas</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Size the storage and network for an IP camera system: how many drives you need for a retention period, or how many days a set of drives will hold.</p>
+    </div>
+    <img src="/green-jay-mark.webp" alt="" width="220" height="239" style="width: 220px; height: auto; flex-shrink: 0;" />
+  </div>
+
+  <p class="notice" style="margin-top: 24px;">
+    Estimate only. The bitrates here are conservative starting points, not any vendor's figures. Real streams change with the scene, lighting, camera settings and firmware, so replace them with the bitrate your cameras actually show, and check the result against your recorder or VMS vendor's own tool before you buy drives.
+  </p>
+
+  <!-- Cameras -->
+  <section class="section">
+    <h2>Cameras</h2>
+    <p class="hint">One row per camera type. Pick a resolution, frame rate, codec and quality for a starting bitrate, or type your own bitrate to override it. Motion recording only stores the share of the day you enter.</p>
+
+    <div id="cam-list"></div>
+
+    <div class="row" style="margin-top: 16px; margin-bottom: 0;">
+      <button type="button" id="cam-add" class="btn-primary">+ Add camera</button>
+      <button type="button" id="cam-clear" class="btn-secondary">Clear all</button>
+    </div>
+  </section>
+
+  <!-- Storage settings -->
+  <section class="section">
+    <h2>Storage</h2>
+    <p class="hint">Drive sizes and results use decimal terabytes, the way drives are sold. A recorder that shows TiB reads about 9% lower for the same drive.</p>
+
+    <div class="row">
+      <div>
+        <label for="calc-mode">Work out</label>
+        <select id="calc-mode" class="field">
+          <option value="drives" selected>Drives needed for a retention period</option>
+          <option value="days">Days that a set of drives will hold</option>
+        </select>
+      </div>
+      <div id="days-wrap">
+        <label for="days">Days to keep</label>
+        <input type="number" id="days" class="field" min="1" max="3650" value="30" style="width: 110px;" />
+      </div>
+      <div id="count-wrap" style="display: none;">
+        <label for="drive-count">Number of drives</label>
+        <input type="number" id="drive-count" class="field" min="1" max="200" value="8" style="width: 110px;" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="drive-size">Drive size (TB)</label>
+        <input type="number" id="drive-size" class="field" min="0.5" max="100" step="0.5" value="8" style="width: 110px;" />
+      </div>
+      <div>
+        <label for="raid">RAID level</label>
+        <select id="raid" class="field">
+          <option value="none">No RAID (drives used as one pool)</option>
+          <option value="5" selected>RAID 5 (one drive of parity)</option>
+          <option value="6">RAID 6 (two drives of parity)</option>
+          <option value="10">RAID 10 (mirrored pairs)</option>
+        </select>
+      </div>
+      <div>
+        <label for="headroom">Keep free (headroom, %)</label>
+        <input type="number" id="headroom" class="field" min="0" max="50" value="20" style="width: 110px;" />
+      </div>
+      <div id="spare-wrap">
+        <label for="spare">Hot spare</label>
+        <select id="spare" class="field">
+          <option value="0" selected>None</option>
+          <option value="1">One spare drive</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="results" style="max-width: 640px;">
+      <table>
+        <tbody id="out-storage"></tbody>
+      </table>
+    </div>
+    <p id="notes" class="warning" style="display: none;"></p>
+  </section>
+
+  <!-- Network -->
+  <section class="section">
+    <h2>Network</h2>
+    <p class="hint">Total camera traffic arriving at the recorder, compared with the link it plugs into. The same headroom is kept free on the link. Check the PoE power budget for the switch in <a href="/tools/stellersjay">Steller&rsquo;s Jay</a>.</p>
+
+    <div class="row">
+      <div>
+        <label for="uplink">Link to the recorder (Gbps)</label>
+        <select id="uplink" class="field">
+          <option value="0.1">0.1 (100 Mbps)</option>
+          <option value="1" selected>1 (Gigabit)</option>
+          <option value="2.5">2.5</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="results" style="max-width: 640px;">
+      <table>
+        <tbody id="out-network"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" style="margin-top: 0;">
+    <button type="button" id="csv" class="btn-secondary">Download CSV</button>
+  </section>
+
+  <template id="cam-tpl">
+    <div class="cam">
+      <div class="cam-grid">
+        <label class="f f-name"><span>Name</span><input type="text" class="field" data-f="name" maxlength="60" placeholder="Camera (optional)" /></label>
+        <label class="f"><span>Resolution</span>
+          <select class="field" data-f="res">
+            <option value="2">2 MP (1080p)</option>
+            <option value="4">4 MP</option>
+            <option value="5">5 MP</option>
+            <option value="8">8 MP (4K)</option>
+            <option value="12">12 MP</option>
+          </select>
+        </label>
+        <label class="f"><span>Frames/sec</span><input type="number" class="field" data-f="fps" min="1" max="60" value="15" /></label>
+        <label class="f"><span>Codec</span>
+          <select class="field" data-f="codec">
+            <option value="h264">H.264</option>
+            <option value="h265" selected>H.265</option>
+          </select>
+        </label>
+        <label class="f"><span>Quality</span>
+          <select class="field" data-f="quality">
+            <option value="low">Low</option>
+            <option value="med" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label class="f"><span>Recording</span>
+          <select class="field" data-f="mode">
+            <option value="always" selected>Always</option>
+            <option value="motion">Motion</option>
+          </select>
+        </label>
+        <label class="f" data-f="motion-wrap" style="display: none;"><span>Motion (% of day)</span><input type="number" class="field" data-f="motion" min="1" max="100" value="30" /></label>
+        <label class="f"><span>Bitrate (Mbps)</span><input type="number" class="field" data-f="bitrate" min="0.1" max="200" step="0.1" /></label>
+        <label class="f"><span>How many</span><input type="number" class="field" data-f="qty" min="1" max="999" value="1" /></label>
+        <button type="button" class="icon-btn" data-f="remove" aria-label="Remove this camera">&times;</button>
+      </div>
+      <div class="cam-foot">
+        <span data-f="sum"></span>
+        <button type="button" class="link-btn" data-f="reset" hidden>Reset bitrate to the preset</button>
+      </div>
+    </div>
+  </template>
+
+  <Footer />
+</Layout>
+
+<style>
+  .section {
+    margin: 40px 0;
+  }
+  h2 {
+    font-size: 20px;
+    margin: 0 0 6px;
+  }
+  .hint {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    max-width: 640px;
+  }
+  .notice {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    max-width: 640px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    border: 1px solid #e0b374;
+    border-radius: 8px;
+  }
+  .row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 24px;
+  }
+  label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .field {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    max-width: 100%;
+    height: 40px;
+  }
+  .field:focus-visible,
+  .icon-btn:focus-visible,
+  .link-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border: none;
+    color: #0d0d0f;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* One card per camera. The fields wrap on their own, so no phone-specific layout is needed. */
+  #cam-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .cam {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    max-width: 900px;
+  }
+  .cam-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  .f {
+    margin: 0;
+    min-width: 0;
+  }
+  .f span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .f .field {
+    width: 100%;
+  }
+  .f-name {
+    grid-column: span 2;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    justify-self: end;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .icon-btn:hover {
+    color: var(--text);
+    border-color: var(--text-faint);
+  }
+  .cam-foot {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .results {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 14px;
+  }
+  tbody :global(tr) {
+    border-bottom: 1px solid var(--border);
+  }
+  tbody :global(tr:last-child) {
+    border-bottom: none;
+  }
+  tbody :global(td) {
+    padding: 14px 20px;
+    vertical-align: top;
+  }
+  tbody :global(td:first-child) {
+    color: var(--text-faint);
+  }
+  tbody :global(td:last-child) {
+    color: var(--text);
+    text-align: right;
+    font-weight: 700;
+  }
+  tbody :global(td.over) {
+    color: #e0b374;
+  }
+  .warning {
+    margin: 12px 0 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: #e0b374;
+    max-width: 640px;
+  }
+</style>
+
+<script>
+  // Starting bitrates (Mbps) for H.264, medium quality, 15 frames/sec. Deliberately on the high side,
+  // so a size worked out from them leans towards too much disk rather than too little.
+  const BASE: Record<string, number> = { '2': 4, '4': 6, '5': 7, '8': 12, '12': 16 };
+  const RES_LABEL: Record<string, string> = { '2': '2 MP (1080p)', '4': '4 MP', '5': '5 MP', '8': '8 MP (4K)', '12': '12 MP' };
+  const CODEC_FACTOR: Record<string, number> = { h264: 1, h265: 0.6 };
+  const CODEC_LABEL: Record<string, string> = { h264: 'H.264', h265: 'H.265' };
+  const QUALITY_FACTOR: Record<string, number> = { low: 0.6, med: 1, high: 1.5 };
+  const QUALITY_LABEL: Record<string, string> = { low: 'Low', med: 'Medium', high: 'High' };
+  // 1 Mbps for 24 hours = 1,000,000 bit/s x 86,400 s / 8 = 10.8 GB (decimal).
+  const GB_PER_MBPS_DAY = 10.8;
+
+  interface Fields {
+    name: HTMLInputElement;
+    res: HTMLSelectElement;
+    fps: HTMLInputElement;
+    codec: HTMLSelectElement;
+    quality: HTMLSelectElement;
+    mode: HTMLSelectElement;
+    motion: HTMLInputElement;
+    motionWrap: HTMLElement;
+    bitrate: HTMLInputElement;
+    qty: HTMLInputElement;
+    sum: HTMLElement;
+    reset: HTMLButtonElement;
+  }
+  interface Cam {
+    el: HTMLElement;
+    f: Fields;
+    manual: boolean;
+  }
+  interface Line {
+    name: string;
+    res: string;
+    fps: number;
+    codec: string;
+    quality: string;
+    mode: string;
+    motion: number;
+    qty: number;
+    bitrate: number;
+    gbDayEach: number;
+    tbPeriod: number;
+  }
+
+  const camList = document.getElementById('cam-list') as HTMLDivElement;
+  const tpl = document.getElementById('cam-tpl') as HTMLTemplateElement;
+  const calcMode = document.getElementById('calc-mode') as HTMLSelectElement;
+  const daysWrap = document.getElementById('days-wrap') as HTMLDivElement;
+  const countWrap = document.getElementById('count-wrap') as HTMLDivElement;
+  const daysInput = document.getElementById('days') as HTMLInputElement;
+  const countInput = document.getElementById('drive-count') as HTMLInputElement;
+  const sizeInput = document.getElementById('drive-size') as HTMLInputElement;
+  const raidSelect = document.getElementById('raid') as HTMLSelectElement;
+  const headroomInput = document.getElementById('headroom') as HTMLInputElement;
+  const spareWrap = document.getElementById('spare-wrap') as HTMLDivElement;
+  const spareSelect = document.getElementById('spare') as HTMLSelectElement;
+  const uplinkSelect = document.getElementById('uplink') as HTMLSelectElement;
+  const outStorage = document.getElementById('out-storage') as HTMLTableSectionElement;
+  const outNetwork = document.getElementById('out-network') as HTMLTableSectionElement;
+  const notesEl = document.getElementById('notes') as HTMLParagraphElement;
+
+  const cams: Cam[] = [];
+  let lastLines: Line[] = [];
+  let lastDays = 0;
+
+  function clamp(n: number, lo: number, hi: number) {
+    return Math.min(hi, Math.max(lo, n));
+  }
+  function readNum(el: HTMLInputElement, lo: number, hi: number, fallback: number) {
+    const v = Number(el.value);
+    return el.value.trim() !== '' && Number.isFinite(v) ? clamp(v, lo, hi) : fallback;
+  }
+  function fmt(n: number, digits = 1) {
+    return n.toLocaleString('en-US', { maximumFractionDigits: digits });
+  }
+  function ceilSafe(n: number) {
+    // guards against 3.0000000000004 rounding up to 4
+    return Math.ceil(n - 1e-9);
+  }
+
+  function presetBitrate(res: string, fps: number, codec: string, quality: string) {
+    // The frame rate factor is not a straight line, because key frames and overhead don't shrink with it.
+    const fpsFactor = 0.4 + 0.6 * (fps / 15);
+    const v = (BASE[res] ?? 4) * (CODEC_FACTOR[codec] ?? 1) * (QUALITY_FACTOR[quality] ?? 1) * fpsFactor;
+    return Math.max(0.1, Math.round(v * 10) / 10);
+  }
+
+  function csvCell(v: string | number) {
+    const s = String(v);
+    // Neutralise spreadsheet formulas: a text cell starting with = + - @ (or tab/CR)
+    // is evaluated by Excel/Sheets, so prefix it with an apostrophe.
+    const safe = typeof v === 'string' && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  }
+
+  function fillRows(body: HTMLTableSectionElement, rows: [string, string, boolean?][]) {
+    body.textContent = '';
+    for (const [label, value, over] of rows) {
+      const tr = document.createElement('tr');
+      const a = document.createElement('td');
+      a.textContent = label;
+      const b = document.createElement('td');
+      b.textContent = value;
+      if (over) b.className = 'over';
+      tr.append(a, b);
+      body.appendChild(tr);
+    }
+  }
+
+  function addCam(init: { name?: string; res?: string; fps?: number; codec?: string; quality?: string; mode?: string; motion?: number; qty?: number } = {}) {
+    const el = (tpl.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
+    const q = <T extends HTMLElement>(k: string) => el.querySelector(`[data-f="${k}"]`) as T;
+    const f: Fields = {
+      name: q('name'), res: q('res'), fps: q('fps'), codec: q('codec'), quality: q('quality'), mode: q('mode'),
+      motion: q('motion'), motionWrap: q('motion-wrap'), bitrate: q('bitrate'), qty: q('qty'), sum: q('sum'), reset: q('reset')
+    };
+    if (init.name !== undefined) f.name.value = init.name;
+    if (init.res) f.res.value = init.res;
+    if (init.fps) f.fps.value = String(init.fps);
+    if (init.codec) f.codec.value = init.codec;
+    if (init.quality) f.quality.value = init.quality;
+    if (init.mode) f.mode.value = init.mode;
+    if (init.motion) f.motion.value = String(init.motion);
+    if (init.qty) f.qty.value = String(init.qty);
+
+    const cam: Cam = { el, f, manual: false };
+    [f.name, f.res, f.fps, f.codec, f.quality, f.mode, f.motion, f.qty].forEach((c) => {
+      c.addEventListener('input', update);
+      c.addEventListener('change', update);
+    });
+    f.bitrate.addEventListener('input', () => {
+      cam.manual = true;
+      update();
+    });
+    f.reset.addEventListener('click', () => {
+      cam.manual = false;
+      update();
+    });
+    (q('remove') as HTMLButtonElement).addEventListener('click', () => {
+      cams.splice(cams.indexOf(cam), 1);
+      el.remove();
+      update();
+    });
+    cams.push(cam);
+    camList.appendChild(el);
+    return cam;
+  }
+
+  // Data drives (the ones that hold footage) for n drives in total.
+  function dataDrives(raid: string, n: number) {
+    if (raid === 'none') return n;
+    if (raid === '5') return n >= 3 ? n - 1 : 0;
+    if (raid === '6') return n >= 4 ? n - 2 : 0;
+    return n >= 4 ? Math.floor(n / 2) : 0; // RAID 10
+  }
+  // Total drives for k drives' worth of capacity.
+  function drivesFor(raid: string, k: number) {
+    if (raid === 'none') return Math.max(1, k);
+    if (raid === '5') return Math.max(3, k + 1);
+    if (raid === '6') return Math.max(4, k + 2);
+    return Math.max(4, 2 * k);
+  }
+
+  function update() {
+    const mode = calcMode.value;
+    daysWrap.style.display = mode === 'drives' ? '' : 'none';
+    countWrap.style.display = mode === 'days' ? '' : 'none';
+    const raid = raidSelect.value;
+    spareWrap.style.display = raid === 'none' ? 'none' : '';
+
+    const days = Math.round(readNum(daysInput, 1, 3650, 30));
+    const headroom = readNum(headroomInput, 0, 50, 20) / 100;
+    const size = readNum(sizeInput, 0.5, 100, 8);
+    const spare = raid !== 'none' && spareSelect.value === '1' ? 1 : 0;
+
+    const notes: string[] = [];
+    const lines: Line[] = [];
+    let totalMbps = 0;
+    let gbDay = 0;
+    let totalCams = 0;
+
+    cams.forEach((cam, i) => {
+      const f = cam.f;
+      const res = f.res.value;
+      const fps = Math.round(readNum(f.fps, 1, 60, 15));
+      const codec = f.codec.value;
+      const quality = f.quality.value;
+      const camMode = f.mode.value;
+      const motion = Math.round(readNum(f.motion, 1, 100, 30));
+      const qty = Math.round(readNum(f.qty, 0, 999, 1));
+      f.motionWrap.style.display = camMode === 'motion' ? '' : 'none';
+
+      const preset = presetBitrate(res, fps, codec, quality);
+      if (!cam.manual) f.bitrate.value = String(preset);
+      const br = cam.manual ? readNum(f.bitrate, 0, 200, 0) : preset;
+      f.reset.hidden = !cam.manual;
+
+      const fraction = camMode === 'motion' ? motion / 100 : 1;
+      const gbEach = br * GB_PER_MBPS_DAY * fraction;
+      f.sum.textContent = br > 0
+        ? `${fmt(gbEach)} GB/day each, ${fmt(gbEach * qty)} GB/day for ${qty}`
+        : 'Enter a bitrate above 0 Mbps';
+
+      totalMbps += br * qty;
+      gbDay += gbEach * qty;
+      totalCams += qty;
+      lines.push({
+        name: f.name.value.trim() || `Camera ${i + 1}`,
+        res: RES_LABEL[res], fps, codec: CODEC_LABEL[codec], quality: QUALITY_LABEL[quality],
+        mode: camMode === 'motion' ? 'Motion only' : 'Always', motion: camMode === 'motion' ? motion : 100,
+        qty, bitrate: br, gbDayEach: gbEach, tbPeriod: 0
+      });
+    });
+
+    const tbDay = gbDay / 1000;
+    const rows: [string, string, boolean?][] = [];
+    rows.push(['Cameras', fmt(totalCams, 0)]);
+    rows.push(['Total bitrate', `${fmt(totalMbps)} Mbps`]);
+    rows.push(['Footage per day', `${fmt(tbDay, 2)} TB`]);
+
+    if (tbDay <= 0) {
+      rows.push(['Result', 'Add a camera with a bitrate above 0']);
+      lastDays = days;
+    } else if (mode === 'drives') {
+      lastDays = days;
+      const data = tbDay * days;
+      const need = data / (1 - headroom);
+      const k = Math.max(1, ceilSafe(need / size));
+      const base = drivesFor(raid, k);
+      const total = base + spare;
+      const usable = dataDrives(raid, base) * size;
+      rows.push([`Footage for ${days} days`, `${fmt(data, 1)} TB`]);
+      rows.push([`Usable space needed (${fmt(headroom * 100, 0)}% kept free)`, `${fmt(need, 1)} TB`]);
+      rows.push(['Drives needed', `${total} x ${fmt(size, 1)} TB${spare ? ' (includes 1 spare)' : ''}`]);
+      rows.push(['Usable capacity', `${fmt(usable, 1)} TB`]);
+      rows.push(['Raw capacity', `${fmt(total * size, 1)} TB`]);
+      lines.forEach((l) => (l.tbPeriod = (l.gbDayEach * l.qty * days) / 1000));
+    } else {
+      const n = Math.round(readNum(countInput, 1, 200, 8));
+      const inArray = n - spare;
+      const k = dataDrives(raid, Math.max(0, inArray));
+      const usable = k * size;
+      const keep = usable * (1 - headroom);
+      const fit = Math.floor(keep / tbDay + 1e-9);
+      lastDays = fit;
+      rows.push(['Drives', `${n} x ${fmt(size, 1)} TB${spare ? ' (1 is a spare)' : ''}`]);
+      if (k === 0) {
+        const min = raid === '5' ? 3 : 4;
+        rows.push(['Result', `RAID ${raid} needs at least ${min} drives in the array`, true]);
+      } else {
+        rows.push(['Usable capacity', `${fmt(usable, 1)} TB`]);
+        rows.push([`Fills to (${fmt(headroom * 100, 0)}% kept free)`, `${fmt(keep, 1)} TB`]);
+        rows.push(['Days of footage that fit', `${fmt(fit, 0)} days`]);
+        lines.forEach((l) => (l.tbPeriod = (l.gbDayEach * l.qty * fit) / 1000));
+      }
+      if (raid === '10' && inArray % 2 === 1 && inArray >= 4) notes.push('RAID 10 uses drives in pairs, so one drive in the array sits unused.');
+    }
+    if (raid === 'none') notes.push('With no RAID, one failed drive loses the footage on it. A single pool is fine for a small site or short retention, but RAID 5 or 6 is the usual choice for a recorder you depend on.');
+    if (raid === '5' && size >= 12) notes.push('With large drives, a RAID 5 rebuild takes a long time and a second failure during it loses the array. RAID 6 is safer here.');
+    if (cams.some((c) => c.manual)) notes.push('Some bitrates were typed in by hand and no longer follow the presets.');
+
+    fillRows(outStorage, rows);
+
+    // Network
+    const linkMbps = Number(uplinkSelect.value) * 1000;
+    const budget = linkMbps * (1 - headroom);
+    const netRows: [string, string, boolean?][] = [];
+    netRows.push(['Camera traffic', `${fmt(totalMbps)} Mbps`]);
+    netRows.push(['Link speed', `${fmt(linkMbps, 0)} Mbps`]);
+    netRows.push([`Usable (${fmt(headroom * 100, 0)}% kept free)`, `${fmt(budget, 0)} Mbps`]);
+    const used = linkMbps > 0 ? (totalMbps / linkMbps) * 100 : 0;
+    const over = totalMbps > budget;
+    netRows.push(['Link in use', `${fmt(used, 1)}%`, over]);
+    if (totalMbps > 0 && totalCams > 0) {
+      const avg = totalMbps / totalCams;
+      netRows.push(['Cameras that fit at this average', fmt(Math.floor(budget / avg + 1e-9), 0)]);
+    }
+    if (over) notes.push('Camera traffic is over the usable share of the link. Use a faster link to the recorder, or split the cameras across more than one recorder or network port.');
+    fillRows(outNetwork, netRows);
+
+    notesEl.textContent = notes.join(' ');
+    notesEl.style.display = notes.length ? 'block' : 'none';
+    lastLines = lines;
+  }
+
+  [calcMode, daysInput, countInput, sizeInput, raidSelect, headroomInput, spareSelect, uplinkSelect].forEach((el) => {
+    el.addEventListener('input', update);
+    el.addEventListener('change', update);
+  });
+
+  (document.getElementById('cam-add') as HTMLButtonElement).addEventListener('click', () => {
+    const cam = addCam();
+    update();
+    cam.f.name.focus();
+  });
+  (document.getElementById('cam-clear') as HTMLButtonElement).addEventListener('click', () => {
+    if (cams.length && !confirm('Remove every camera from the list?')) return;
+    cams.splice(0).forEach((c) => c.el.remove());
+    update();
+  });
+
+  (document.getElementById('csv') as HTMLButtonElement).addEventListener('click', () => {
+    const header = ['Camera', 'Resolution', 'Frames/sec', 'Codec', 'Quality', 'Recording', 'Motion (% of day)', 'How many', 'Bitrate each (Mbps)', 'GB per day each', `TB for ${lastDays} days (all)`];
+    const out = [header.join(',')];
+    let q = 0, mbps = 0, gb = 0, tb = 0;
+    for (const l of lastLines) {
+      out.push(
+        [l.name, l.res, l.fps, l.codec, l.quality, l.mode, l.motion, l.qty, Math.round(l.bitrate * 10) / 10, Math.round(l.gbDayEach * 100) / 100, Math.round(l.tbPeriod * 1000) / 1000]
+          .map(csvCell)
+          .join(',')
+      );
+      q += l.qty;
+      mbps += l.bitrate * l.qty;
+      gb += l.gbDayEach * l.qty;
+      tb += l.tbPeriod;
+    }
+    out.push(['Total', '', '', '', '', '', '', q, Math.round(mbps * 10) / 10, Math.round(gb * 100) / 100, Math.round(tb * 1000) / 1000].map(csvCell).join(','));
+    out.push('');
+    out.push(csvCell('Estimate; verify against your VMS vendor’s tool.'));
+    const blob = new Blob([out.join('\n') + '\n'], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'camera-storage.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  addCam({ name: 'Entrances', res: '4', fps: 15, codec: 'h265', quality: 'med', mode: 'always', qty: 6 });
+  addCam({ name: 'Parking lot', res: '8', fps: 15, codec: 'h265', quality: 'med', mode: 'motion', motion: 30, qty: 4 });
+  update();
+</script>

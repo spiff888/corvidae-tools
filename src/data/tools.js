@@ -65,5 +65,13 @@ export const tools = [
     description: 'Pull the text out of a screenshot or photo (OCR). Runs entirely in your browser.',
     status: 'beta',
     href: '/tools/eurasianjay'
+  },
+  {
+    slug: 'greenjay',
+    name: 'Green Jay',
+    latin: 'Cyanocorax yncas',
+    description: 'Camera storage and bandwidth calculator: drives, RAID, retention days and network load.',
+    status: 'beta',
+    href: '/tools/greenjay'
   }
 ];
