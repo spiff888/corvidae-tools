@@ -12,6 +12,10 @@ body:
         - Nutcracker (PDF)
         - Chough (QR codes)
         - Rook (subnet calculator)
+        - Steller's Jay (PoE and UPS)
+        - Blue Jay (DMX lighting)
+        - Eurasian Jay (OCR)
+        - Green Jay (camera storage)
         - Other
     validations:
       required: true
