@@ -385,7 +385,8 @@ html[data-season="thanksgiving"] .footer {
 
 .nav-links {
   display: flex;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: 8px 32px;
   font-family: var(--font-mono);
   font-size: 14px;
   color: var(--text-dim);
