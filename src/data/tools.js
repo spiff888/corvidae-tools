@@ -73,5 +73,13 @@ export const tools = [
     description: 'Camera storage and bandwidth calculator: drives, RAID, retention days and network load.',
     status: 'beta',
     href: '/tools/greenjay'
+  },
+  {
+    slug: 'canadajay',
+    name: 'Canada Jay',
+    latin: 'Perisoreus canadensis',
+    description: 'Projector throw distance and lens calculator: the throw ratio a screen needs, or where to mount for a lens.',
+    status: 'beta',
+    href: '/tools/canadajay'
   }
 ];

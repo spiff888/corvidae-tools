@@ -16,6 +16,7 @@ body:
         - Blue Jay (DMX lighting)
         - Eurasian Jay (OCR)
         - Green Jay (camera storage)
+        - Canada Jay (projector throw)
         - Other
     validations:
       required: true

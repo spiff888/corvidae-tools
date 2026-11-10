@@ -1,0 +1,720 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Footer from '../../components/Footer.astro';
+---
+
+<Layout title="Canada Jay — projector throw distance & lens calculator — corvidae.tools" description="Work out the throw ratio and lens a projector needs for a screen size and distance, or where to mount a projector for a given lens. Runs entirely in your browser.">
+  <a href="/" class="back-link">&larr; corvidae.tools</a>
+
+  <div style="display: flex; align-items: center; gap: 40px; flex-wrap: wrap; margin-bottom: 8px;">
+    <div style="flex: 1; min-width: 260px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;">
+        <h1 style="font-size: 32px; margin: 0;">Canada Jay</h1>
+        <span style="font-family: var(--font-mono); font-style: italic; font-size: 14px; color: var(--text-faint);">Perisoreus canadensis</span>
+      </div>
+      <p class="tagline" style="margin-top: 8px; margin-bottom: 0;">Projector throw distance and lens calculator: what lens a screen and distance call for, or where to mount a projector for the lens you have.</p>
+    </div>
+    <img src="/canada-jay-mark.webp" alt="" width="220" height="239" style="width: 220px; height: auto; flex-shrink: 0;" />
+  </div>
+
+  <p class="notice" style="margin-top: 24px;">
+    Estimate only. Throw ratios on spec sheets are typically accurate to about 5%, and the exact distance range also depends on the lens position and on how the vendor measures distance. Check the projector and lens spec sheets before you mount anything.
+  </p>
+
+  <!-- Screen and distance (shared by both tabs) -->
+  <section class="section">
+    <h2>Screen and distance</h2>
+    <p class="hint">Throw ratio is the distance from the lens to the screen divided by the width of the image.</p>
+
+    <div class="row">
+      <div class="wide">
+        <label for="units">Units</label>
+        <select id="units" class="field">
+          <option value="us" selected>Inches and feet</option>
+          <option value="metric">Centimeters and meters</option>
+        </select>
+      </div>
+      <div class="wide">
+        <label for="aspect">Image shape</label>
+        <select id="aspect" class="field">
+          <option value="1.777778" selected>16:9</option>
+          <option value="1.6">16:10</option>
+          <option value="1.333333">4:3</option>
+          <option value="1.85">1.85:1</option>
+          <option value="2.39">2.39:1 (widescreen)</option>
+          <option value="1">1:1 (square)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="wide">
+        <label for="size-mode">Screen size given as</label>
+        <select id="size-mode" class="field">
+          <option value="diag" selected>Diagonal</option>
+          <option value="width">Width</option>
+        </select>
+      </div>
+      <div>
+        <label for="size" id="size-label">Screen size (in)</label>
+        <input type="number" id="size" class="field" min="0" step="any" value="150" style="width: 130px;" />
+      </div>
+      <div>
+        <label for="dist" id="dist-label">Lens to screen (ft)</label>
+        <input type="number" id="dist" class="field" min="0" step="any" value="25" style="width: 130px;" />
+      </div>
+    </div>
+
+    <p id="readout" class="readout"></p>
+    <p id="problem" class="warning" style="display: none;"></p>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="Canada Jay tools">
+    <button type="button" class="tab" role="tab" id="tab-need" aria-controls="panel-need" aria-selected="true">What lens?</button>
+    <button type="button" class="tab" role="tab" id="tab-check" aria-controls="panel-check" aria-selected="false">Check a lens</button>
+  </div>
+
+  <!-- What lens do I need? -->
+  <div id="panel-need" role="tabpanel" aria-labelledby="tab-need">
+    <section class="section" style="margin-top: 24px;">
+      <h2>What lens do I need?</h2>
+      <p class="hint">For this screen at this distance. The type is a rough guide, since vendors draw the lines in slightly different places. Add your own lenses at the bottom of the page to see which ones fit.</p>
+      <div class="results" style="max-width: 640px;">
+        <table><tbody id="out-need"></tbody></table>
+      </div>
+
+      <h3>Your lenses</h3>
+      <div class="results" style="max-width: 640px;">
+        <table><tbody id="out-lenses"></tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Check a lens -->
+  <div id="panel-check" role="tabpanel" aria-labelledby="tab-check" hidden>
+    <section class="section" style="margin-top: 24px;">
+      <h2>Check a lens</h2>
+      <p class="hint">Enter a lens's throw ratio range from its spec sheet. For a fixed lens enter one number. This shows where the projector can sit for the screen above, and how big the image will be at the distance above.</p>
+
+      <div class="row">
+        <div class="wide">
+          <label for="lens-pick">Use one of your lenses</label>
+          <select id="lens-pick" class="field"></select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="lens-min">Throw ratio (wide end)</label>
+          <input type="number" id="lens-min" class="field" min="0" step="any" value="1.5" style="width: 130px;" />
+        </div>
+        <div>
+          <label for="lens-max">Tele end (optional)</label>
+          <input type="number" id="lens-max" class="field" min="0" step="any" value="3" style="width: 130px;" />
+        </div>
+      </div>
+
+      <div class="results" style="max-width: 640px;">
+        <table><tbody id="out-check"></tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Brightness -->
+  <section class="section">
+    <h2>Brightness (optional)</h2>
+    <p class="hint">How bright the image will be on this screen. Enter the projector's rated lumens and the screen gain (1.0 for a plain matte white screen).</p>
+    <div class="row">
+      <div>
+        <label for="lumens">Lumens</label>
+        <input type="number" id="lumens" class="field" min="0" step="any" placeholder="e.g. 6000" style="width: 130px;" />
+      </div>
+      <div>
+        <label for="gain">Screen gain</label>
+        <input type="number" id="gain" class="field" min="0.1" max="5" step="0.1" value="1" style="width: 130px;" />
+      </div>
+    </div>
+    <div id="bright-wrap" class="results" style="max-width: 640px; display: none;">
+      <table><tbody id="out-bright"></tbody></table>
+    </div>
+    <p id="bright-note" class="hint" style="display: none; margin: 12px 0 0;">A common target for a darkened room is about 16 fL (55 nits). Rooms with the lights on need much more, and output falls as a lamp or laser ages, so leave margin and check the vendor's guidance for your room.</p>
+  </section>
+
+  <!-- Lens list -->
+  <section class="section">
+    <h2>Your lenses</h2>
+    <p class="hint">Keep the lenses you have or are considering. They are saved in this browser only and are used by both tabs. Leave the second number blank for a fixed lens.</p>
+    <div id="lens-list"></div>
+    <div class="row" style="margin-top: 16px; margin-bottom: 0;">
+      <button type="button" id="lens-add" class="btn-primary">+ Add lens</button>
+    </div>
+  </section>
+
+  <template id="lens-tpl">
+    <div class="lens">
+      <div class="lens-grid">
+        <label class="f f-name"><span>Lens name</span><input type="text" class="field" data-f="name" maxlength="60" placeholder="e.g. Short zoom" /></label>
+        <label class="f"><span>Ratio (wide)</span><input type="number" class="field" data-f="min" min="0" step="any" /></label>
+        <label class="f"><span>Ratio (tele)</span><input type="number" class="field" data-f="max" min="0" step="any" /></label>
+        <button type="button" class="icon-btn" data-f="remove" aria-label="Remove this lens">&times;</button>
+      </div>
+    </div>
+  </template>
+
+  <Footer />
+</Layout>
+
+<style>
+  .section {
+    margin: 40px 0;
+  }
+  h2 {
+    font-size: 20px;
+    margin: 0 0 6px;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 28px 0 10px;
+  }
+  .hint {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    max-width: 640px;
+  }
+  .notice {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    max-width: 640px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    border: 1px solid #e0b374;
+    border-radius: 8px;
+  }
+  .row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 24px;
+  }
+  label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .field {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    max-width: 100%;
+    height: 40px;
+  }
+  /* dropdowns with long labels must shrink to the screen instead of widening the page */
+  .wide {
+    flex: 1 1 220px;
+    max-width: 320px;
+    min-width: 0;
+  }
+  .wide .field {
+    width: 100%;
+  }
+  .field:focus-visible,
+  .icon-btn:focus-visible,
+  .tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border: none;
+    color: #0d0d0f;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .readout {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    max-width: 640px;
+  }
+  .warning {
+    margin: 12px 0 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: #e0b374;
+    max-width: 640px;
+  }
+
+  /* Tabs (same look as Blue Jay) */
+  .tabs {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 24px 0 8px;
+  }
+  .tab {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .tab[aria-selected='true'] {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Lens cards: the fields wrap on their own, so no phone-specific layout is needed. */
+  #lens-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .lens {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    max-width: 640px;
+  }
+  .lens-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  .f {
+    margin: 0;
+    min-width: 0;
+  }
+  .f span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .f .field {
+    width: 100%;
+  }
+  .f-name {
+    grid-column: span 2;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    justify-self: end;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .icon-btn:hover {
+    color: var(--text);
+    border-color: var(--text-faint);
+  }
+
+  .results {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 14px;
+  }
+  tbody :global(tr) {
+    border-bottom: 1px solid var(--border);
+  }
+  tbody :global(tr:last-child) {
+    border-bottom: none;
+  }
+  tbody :global(td) {
+    padding: 14px 20px;
+    vertical-align: top;
+  }
+  tbody :global(td:first-child) {
+    color: var(--text-faint);
+  }
+  tbody :global(td:last-child) {
+    color: var(--text);
+    text-align: right;
+    font-weight: 700;
+  }
+  tbody :global(td.over) {
+    color: #e0b374;
+  }
+  tbody :global(tr.no) :global(td:last-child) {
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  tbody :global(.sub) {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-dim);
+  }
+</style>
+
+<script>
+  // ---------- Units and screen maths (everything is held in meters internally) ----------
+  type Unit = 'us' | 'metric';
+  const sizeToM = (v: number, u: Unit) => (u === 'us' ? v * 0.0254 : v / 100);
+  const mToSize = (m: number, u: Unit) => (u === 'us' ? m / 0.0254 : m * 100);
+  const distToM = (v: number, u: Unit) => (u === 'us' ? v * 0.3048 : v);
+  const mToDist = (m: number, u: Unit) => (u === 'us' ? m / 0.3048 : m);
+  const sizeUnit = (u: Unit) => (u === 'us' ? 'in' : 'cm');
+  const distUnit = (u: Unit) => (u === 'us' ? 'ft' : 'm');
+
+  // Typical industry bands; vendors draw these lines in slightly different places.
+  const BANDS: { max: number; name: string; range: string }[] = [
+    { max: 0.4, name: 'Ultra-short throw', range: 'under 0.4:1' },
+    { max: 1.0, name: 'Short throw', range: '0.4 to 1.0:1' },
+    { max: 2.0, name: 'Standard throw', range: '1.0 to 2.0:1' },
+    { max: 5.0, name: 'Long throw', range: '2.0 to 5.0:1' },
+    { max: Infinity, name: 'Ultra-long throw', range: 'over 5:1' }
+  ];
+  const FIXED_TOLERANCE = 0.05; // a fixed lens is treated as good to within 5% of its stated ratio
+  const EPS = 0.005; // a ratio quoted to two decimals
+
+  interface Lens {
+    name: string;
+    min: number;
+    max: number;
+  }
+
+  const unitsSel = document.getElementById('units') as HTMLSelectElement;
+  const aspectSel = document.getElementById('aspect') as HTMLSelectElement;
+  const sizeModeSel = document.getElementById('size-mode') as HTMLSelectElement;
+  const sizeInput = document.getElementById('size') as HTMLInputElement;
+  const distInput = document.getElementById('dist') as HTMLInputElement;
+  const sizeLabel = document.getElementById('size-label') as HTMLLabelElement;
+  const distLabel = document.getElementById('dist-label') as HTMLLabelElement;
+  const readout = document.getElementById('readout') as HTMLParagraphElement;
+  const problem = document.getElementById('problem') as HTMLParagraphElement;
+  const outNeed = document.getElementById('out-need') as HTMLTableSectionElement;
+  const outLenses = document.getElementById('out-lenses') as HTMLTableSectionElement;
+  const outCheck = document.getElementById('out-check') as HTMLTableSectionElement;
+  const lensPick = document.getElementById('lens-pick') as HTMLSelectElement;
+  const lensMin = document.getElementById('lens-min') as HTMLInputElement;
+  const lensMax = document.getElementById('lens-max') as HTMLInputElement;
+  const lumensInput = document.getElementById('lumens') as HTMLInputElement;
+  const gainInput = document.getElementById('gain') as HTMLInputElement;
+  const brightWrap = document.getElementById('bright-wrap') as HTMLDivElement;
+  const brightNote = document.getElementById('bright-note') as HTMLParagraphElement;
+  const outBright = document.getElementById('out-bright') as HTMLTableSectionElement;
+  const lensListEl = document.getElementById('lens-list') as HTMLDivElement;
+  const lensTpl = document.getElementById('lens-tpl') as HTMLTemplateElement;
+
+  function fmt(n: number, digits = 1) {
+    return n.toLocaleString('en-US', { maximumFractionDigits: digits });
+  }
+  function fillRows(body: HTMLTableSectionElement, rows: { a: string; b: string; sub?: string; cls?: string; over?: boolean }[]) {
+    body.textContent = '';
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      if (r.cls) tr.className = r.cls;
+      const a = document.createElement('td');
+      a.textContent = r.a;
+      const b = document.createElement('td');
+      b.textContent = r.b;
+      if (r.over) b.className = 'over';
+      if (r.sub) {
+        const s = document.createElement('span');
+        s.className = 'sub';
+        s.textContent = r.sub;
+        b.appendChild(s);
+      }
+      tr.append(a, b);
+      body.appendChild(tr);
+    }
+  }
+  function num(el: HTMLInputElement) {
+    const t = el.value.trim();
+    const v = Number(t);
+    return t !== '' && Number.isFinite(v) ? v : NaN;
+  }
+
+  // ---------- Tabs ----------
+  const tabs = [
+    { btn: document.getElementById('tab-need') as HTMLButtonElement, panel: document.getElementById('panel-need') as HTMLDivElement, hash: '' },
+    { btn: document.getElementById('tab-check') as HTMLButtonElement, panel: document.getElementById('panel-check') as HTMLDivElement, hash: '#check' }
+  ];
+  function showTab(index: number, updateHash = true) {
+    tabs.forEach((t, i) => {
+      t.btn.setAttribute('aria-selected', String(i === index));
+      t.panel.hidden = i !== index;
+    });
+    if (updateHash) history.replaceState(null, '', tabs[index].hash || location.pathname);
+  }
+  tabs.forEach((t, i) => t.btn.addEventListener('click', () => showTab(i)));
+  showTab(location.hash === '#check' ? 1 : 0, false);
+
+  // ---------- Saved lenses ----------
+  const STORAGE_KEY = 'canadajay-lenses-v1';
+  const lensRows: { el: HTMLElement; name: HTMLInputElement; min: HTMLInputElement; max: HTMLInputElement }[] = [];
+
+  function saveLenses() {
+    try {
+      const data = lensRows.map((r) => ({ name: r.name.value.slice(0, 60), min: r.min.value, max: r.max.value }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      /* storage can be blocked; the page works without it */
+    }
+  }
+  function loadLenses(): { name: string; min: string; max: string }[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) return [];
+      return data.slice(0, 50).map((d) => ({ name: String(d?.name ?? '').slice(0, 60), min: String(d?.min ?? ''), max: String(d?.max ?? '') }));
+    } catch {
+      return [];
+    }
+  }
+  function addLensRow(init: { name?: string; min?: string; max?: string } = {}) {
+    const el = (lensTpl.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
+    const q = <T extends HTMLElement>(k: string) => el.querySelector(`[data-f="${k}"]`) as T;
+    const row = { el, name: q<HTMLInputElement>('name'), min: q<HTMLInputElement>('min'), max: q<HTMLInputElement>('max') };
+    row.name.value = init.name ?? '';
+    row.min.value = init.min ?? '';
+    row.max.value = init.max ?? '';
+    [row.name, row.min, row.max].forEach((i) => i.addEventListener('input', () => { saveLenses(); update(); }));
+    q<HTMLButtonElement>('remove').addEventListener('click', () => {
+      lensRows.splice(lensRows.indexOf(row), 1);
+      el.remove();
+      saveLenses();
+      update();
+    });
+    lensRows.push(row);
+    lensListEl.appendChild(el);
+    return row;
+  }
+  function currentLenses(): Lens[] {
+    const out: Lens[] = [];
+    lensRows.forEach((r, i) => {
+      let a = num(r.min);
+      let b = num(r.max);
+      if (!(a > 0)) return;
+      if (!(b > 0)) b = a;
+      if (b < a) [a, b] = [b, a];
+      out.push({ name: r.name.value.trim() || `Lens ${i + 1}`, min: a, max: b });
+    });
+    return out;
+  }
+
+  // ---------- Calculation ----------
+  let prevUnit: Unit = 'us';
+
+  function lensRange(l: Lens) {
+    // A fixed lens is good to within 5% of its ratio; a zoom is taken at its stated range.
+    const fixed = Math.abs(l.max - l.min) < 1e-9;
+    return fixed ? { lo: l.min * (1 - FIXED_TOLERANCE), hi: l.max * (1 + FIXED_TOLERANCE), fixed } : { lo: l.min, hi: l.max, fixed };
+  }
+  function ratioText(l: Lens) {
+    return l.min === l.max ? `${fmt(l.min, 2)}:1 fixed` : `${fmt(l.min, 2)} to ${fmt(l.max, 2)}:1`;
+  }
+
+  function core() {
+    const unit = unitsSel.value as Unit;
+    if (unit !== prevUnit) {
+      // convert what is typed so the same screen and distance carry over
+      const s = num(sizeInput);
+      const d = num(distInput);
+      if (Number.isFinite(s)) sizeInput.value = String(Math.round(mToSize(sizeToM(s, prevUnit), unit) * 100) / 100);
+      if (Number.isFinite(d)) distInput.value = String(Math.round(mToDist(distToM(d, prevUnit), unit) * 100) / 100);
+      prevUnit = unit;
+    }
+    const mode = sizeModeSel.value;
+    sizeLabel.textContent = `${mode === 'diag' ? 'Screen diagonal' : 'Screen width'} (${sizeUnit(unit)})`;
+    distLabel.textContent = `Lens to screen (${distUnit(unit)})`;
+
+    const a = Number(aspectSel.value);
+    const sizeRaw = num(sizeInput);
+    const distRaw = num(distInput);
+    const sizeM = sizeToM(sizeRaw, unit);
+    const widthM = mode === 'diag' ? (sizeM * a) / Math.sqrt(a * a + 1) : sizeM;
+    const heightM = widthM / a;
+    const diagM = Math.hypot(widthM, heightM);
+    const distM = distToM(distRaw, unit);
+
+    const screenOk = widthM >= 0.1 && widthM <= 40;
+    const distOk = distM >= 0.2 && distM <= 150;
+    const sz = (m: number) => `${fmt(mToSize(m, unit), 1)} ${sizeUnit(unit)}`;
+    const ds = (m: number) => `${fmt(mToDist(m, unit), 1)} ${distUnit(unit)}`;
+
+    const msgs: string[] = [];
+    if (!screenOk) msgs.push('Enter a screen size between about 4 in and 40 m wide.');
+    if (!distOk) msgs.push('Enter a lens-to-screen distance between about 1 ft and 500 ft (0.2 to 150 m).');
+    problem.textContent = msgs.join(' ');
+    problem.style.display = msgs.length ? 'block' : 'none';
+
+    readout.textContent = screenOk ? `Image: ${sz(widthM)} wide by ${sz(heightM)} high, ${sz(diagM)} diagonal.` : '';
+
+    // --- What lens? ---
+    const lenses = currentLenses();
+    if (screenOk && distOk) {
+      const R = distM / widthM;
+      const band = BANDS.find((b) => R < b.max) as (typeof BANDS)[number];
+      fillRows(outNeed, [
+        { a: 'Throw ratio needed', b: `${fmt(R, 2)} : 1` },
+        { a: 'Lens type', b: band.name, sub: `typically ${band.range}` },
+        { a: 'Image size', b: `${sz(widthM)} x ${sz(heightM)}` },
+        { a: 'Diagonal', b: sz(diagM) },
+        { a: 'Lens to screen', b: ds(distM) }
+      ]);
+
+      if (!lenses.length) {
+        fillRows(outLenses, [{ a: 'No lenses yet', b: 'Add some at the bottom of the page', cls: 'no' }]);
+      } else {
+        const rows = lenses.map((l) => {
+          const r = lensRange(l);
+          const fits = R >= r.lo - EPS && R <= r.hi + EPS;
+          const near = `${ds(r.lo * widthM)} to ${ds(r.hi * widthM)}`;
+          let status: string;
+          let sub: string;
+          if (fits) {
+            if (r.fixed) {
+              status = 'Fits (fixed lens)';
+              sub = `Good for ${near} at this screen width`;
+            } else {
+              const pct = Math.round(((R - l.min) / (l.max - l.min)) * 100);
+              status = `Fits, ${clampPct(pct)}% of the way from wide to tele`;
+              sub = `Good for ${near} at this screen width`;
+            }
+          } else {
+            status = R < r.lo ? 'Too long: this lens would need the projector farther back' : 'Too wide: this lens would need the projector closer';
+            sub = `For this screen it works from ${near}`;
+          }
+          return { fits, a: l.name, b: status, sub: `${ratioText(l)}. ${sub}`, cls: fits ? '' : 'no' };
+        });
+        rows.sort((x, y) => Number(y.fits) - Number(x.fits));
+        fillRows(outLenses, rows);
+      }
+    } else {
+      fillRows(outNeed, [{ a: 'Result', b: 'Enter a screen size and distance', over: true }]);
+      fillRows(outLenses, []);
+    }
+
+    // --- Check a lens ---
+    let cMin = num(lensMin);
+    let cMax = num(lensMax);
+    if (!(cMin > 0)) {
+      fillRows(outCheck, [{ a: 'Result', b: 'Enter the wide-end throw ratio of the lens', over: true }]);
+    } else {
+      if (!(cMax > 0)) cMax = cMin;
+      if (cMax < cMin) [cMin, cMax] = [cMax, cMin];
+      const lens: Lens = { name: '', min: cMin, max: cMax };
+      const r = lensRange(lens);
+      const rows: { a: string; b: string; sub?: string; over?: boolean }[] = [];
+      rows.push({ a: 'Throw ratio', b: ratioText(lens), sub: r.fixed ? 'Taken as good to within 5%' : undefined });
+      if (screenOk) {
+        rows.push({ a: 'Projector can sit', b: `${ds(r.lo * widthM)} to ${ds(r.hi * widthM)}`, sub: `from the screen, for a ${sz(widthM)} wide image` });
+        if (distOk) {
+          const inside = distM >= r.lo * widthM - 1e-9 && distM <= r.hi * widthM + 1e-9;
+          rows.push({ a: `Your ${ds(distM)}`, b: inside ? 'Inside that range' : 'Outside that range', over: !inside });
+        }
+      }
+      if (distOk) {
+        const wMin = distM / r.hi;
+        const wMax = distM / r.lo;
+        const dMin = Math.hypot(wMin, wMin / a);
+        const dMax = Math.hypot(wMax, wMax / a);
+        rows.push({
+          a: `Image at ${ds(distM)}`,
+          b: r.fixed && wMax - wMin < 1e-9 ? sz(wMin) : `${sz(wMin)} to ${sz(wMax)} wide`,
+          sub: `${sz(dMin)} to ${sz(dMax)} diagonal`
+        });
+      }
+      fillRows(outCheck, rows);
+    }
+
+    // --- Brightness ---
+    const lumens = num(lumensInput);
+    const gain = num(gainInput);
+    const showB = screenOk && lumens > 0 && gain > 0;
+    brightWrap.style.display = showB ? 'block' : 'none';
+    brightNote.style.display = showB ? 'block' : 'none';
+    if (showB) {
+      const areaFt2 = (widthM / 0.3048) * (heightM / 0.3048);
+      const fl = (lumens * gain) / areaFt2;
+      fillRows(outBright, [
+        { a: 'Image area', b: `${fmt(areaFt2, 1)} sq ft`, sub: `${fmt(widthM * heightM, 2)} sq m` },
+        { a: 'Brightness', b: `${fmt(fl, 1)} fL`, sub: `${fmt(fl * 3.426, 0)} nits` }
+      ]);
+    }
+  }
+  function clampPct(p: number) {
+    return Math.min(100, Math.max(0, p));
+  }
+
+  // lens picker in the "Check a lens" tab
+  function rebuildPick() {
+    const keep = lensPick.value;
+    lensPick.textContent = '';
+    const first = document.createElement('option');
+    first.value = '';
+    first.textContent = 'Type a range below';
+    lensPick.appendChild(first);
+    currentLenses().forEach((l, i) => {
+      const o = document.createElement('option');
+      o.value = String(i);
+      o.textContent = `${l.name} (${ratioText(l)})`;
+      lensPick.appendChild(o);
+    });
+    lensPick.value = [...lensPick.options].some((o) => o.value === keep) ? keep : '';
+  }
+  lensPick.addEventListener('change', () => {
+    const i = Number(lensPick.value);
+    const l = lensPick.value === '' ? undefined : currentLenses()[i];
+    if (l) {
+      lensMin.value = String(l.min);
+      lensMax.value = l.max === l.min ? '' : String(l.max);
+    }
+    update();
+  });
+
+  function update() {
+    core();
+    rebuildPick();
+  }
+  const updateAll = update;
+
+  [unitsSel, aspectSel, sizeModeSel, sizeInput, distInput, lensMin, lensMax, lumensInput, gainInput].forEach((el) => {
+    el.addEventListener('input', updateAll);
+    el.addEventListener('change', updateAll);
+  });
+  (document.getElementById('lens-add') as HTMLButtonElement).addEventListener('click', () => {
+    const row = addLensRow();
+    saveLenses();
+    updateAll();
+    row.name.focus();
+  });
+
+  loadLenses().forEach((l) => addLensRow(l));
+  updateAll();
+</script>
