@@ -93,7 +93,7 @@ const universeRows = [
         <label for="u-input">Address</label>
         <input type="text" id="u-input" class="field" value="2.45" spellcheck="false" autocomplete="off" data-1p-ignore data-lpignore="true" style="width: 200px;" />
       </div>
-      <div>
+      <div class="fit">
         <label for="u-base">Universe numbering you typed</label>
         <select id="u-base" class="field">
           <option value="1" selected>Starts at 1 (most consoles, sACN)</option>
@@ -144,6 +144,13 @@ const universeRows = [
         </div>
       </div>
 
+      <div class="row">
+        <div class="wide">
+          <label for="p-project">Project or venue (optional, printed on the PDF)</label>
+          <input type="text" id="p-project" class="field" maxlength="80" placeholder="e.g. Main Sanctuary, Christmas Eve" style="width: 100%;" />
+        </div>
+      </div>
+
       <div class="fixture-head" aria-hidden="true">
         <span>Fixture</span><span>Channels</span><span>Watts</span><span>Qty</span><span>Start (optional)</span><span>Zone (optional)</span><span></span>
       </div>
@@ -153,6 +160,7 @@ const universeRows = [
       <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 32px;">
         <button type="button" id="p-add" class="btn-primary">Add fixture</button>
         <button type="button" id="p-csv" class="btn-secondary">Download CSV</button>
+        <button type="button" id="p-pdf" class="btn-secondary">Download PDF</button>
         <button type="button" id="p-clear" class="btn-secondary">Clear list</button>
       </div>
 
@@ -307,6 +315,19 @@ const universeRows = [
     font-family: var(--font-mono);
     font-size: 13px;
     color: var(--text-muted);
+  }
+  /* a long dropdown label must shrink to the screen instead of widening the page */
+  .fit {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .fit :global(.field) {
+    max-width: 100%;
+  }
+  .wide {
+    flex: 1 1 320px;
+    max-width: 480px;
+    min-width: 0;
   }
   .row {
     display: flex;
@@ -764,6 +785,8 @@ const universeRows = [
 </style>
 
 <script>
+  import { csvLine, downloadFile, safeFilename, todayStamp } from '../../lib/exportHelpers';
+
   // ---------- DIP switches ----------
   const addrInput = document.getElementById('addr-input') as HTMLInputElement;
   const footprintInput = document.getElementById('footprint-input') as HTMLInputElement;
@@ -1278,15 +1301,6 @@ const universeRows = [
     recalcPower();
   }
 
-  function csvCell(v: string | number) {
-    const s = String(v);
-    // Neutralise spreadsheet formulas: a text cell starting with = + - @ (or tab/CR)
-    // is evaluated by Excel/Sheets, so prefix it with an apostrophe.
-    const safe = typeof v === 'string' && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-  }
-
-
   // ---------- Power ----------
   const wOutput = document.getElementById('w-output') as HTMLDivElement;
   const wEmpty = document.getElementById('w-empty') as HTMLDivElement;
@@ -1533,18 +1547,95 @@ const universeRows = [
     const lines = [header.join(',')];
     for (const p of lastPatch) {
       lines.push(
-        [p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address), p.watts > 0 ? p.watts : '', p.zone]
-          .map(csvCell)
-          .join(',')
+        csvLine([p.label, p.universe, p.address, p.endUniverse, p.end, p.channels, `${p.universe}.${String(p.address).padStart(3, '0')}`, (p.universe - 1) * 512 + p.address, dipOn(p.address), p.watts > 0 ? p.watts : '', p.zone])
       );
     }
-    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'dmx-patch.csv';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadFile(lines.join('\n') + '\n', 'dmx-patch.csv', 'text/csv');
+  });
+
+  // text of every visible column header and cell in a table, for the PDF
+  function readTable(body: HTMLTableSectionElement) {
+    const table = body.closest('table') as HTMLTableElement;
+    const head = table.tHead ? [...table.tHead.rows[0].cells] : [];
+    const visible = head.map((th) => th.style.display !== 'none');
+    const heads = head.filter((_, i) => visible[i]).map((th) => th.textContent ?? '');
+    // rows only contain cells for the visible columns already
+    const rows = [...body.rows].map((tr) => [...tr.cells].map((td) => (td.textContent ?? '').trim()));
+    return { heads, rows };
+  }
+
+  const pdfBtn = document.getElementById('p-pdf') as HTMLButtonElement;
+  const projectInput = document.getElementById('p-project') as HTMLInputElement;
+  pdfBtn.addEventListener('click', async () => {
+    if (!lastPatch.length) {
+      pWarning.textContent = 'Add at least one fixture before downloading a PDF.';
+      pWarning.style.display = 'block';
+      return;
+    }
+    const label = pdfBtn.textContent;
+    pdfBtn.disabled = true;
+    pdfBtn.textContent = 'Making PDF...';
+    try {
+      const { createSheet } = await import('../../lib/pdfSheet');
+      const project = projectInput.value.trim();
+      const sheet = await createSheet({
+        title: project ? `DMX patch sheet - ${project}` : 'DMX patch sheet',
+        footer: 'Made with Blue Jay, corvidae.tools/tools/bluejay. Check addresses on the fixtures before relying on this sheet.'
+      });
+      sheet.title('DMX patch sheet');
+      const meta: [string, string][] = [];
+      if (project) meta.push(['Project / venue', project]);
+      meta.push(['Date', todayStamp()]);
+      meta.push(['Universe numbering', 'Counted from 1, as on most consoles and in sACN. Art-Net numbers are one lower (universe 1 = Art-Net 0).']);
+      meta.push(['DIP switch convention', modeSelect.selectedOptions[0]?.textContent ?? '']);
+      sheet.pairs(meta);
+      sheet.paragraph(pSummary.textContent ?? '', { bold: true });
+      if (pWarning.style.display !== 'none' && pWarning.textContent) sheet.paragraph(`Check: ${pWarning.textContent}`, { grey: true });
+
+      const uni = readTable(pUBody);
+      sheet.heading('Universes');
+      sheet.table(
+        uni.heads.map((h, i) => ({ header: h, weight: [1, 1.2, 0.8, 4][i] ?? 1 })),
+        uni.rows
+      );
+
+      const patch = readTable(pBody);
+      sheet.heading('Patch');
+      sheet.table(
+        patch.heads.map((h, i) => ({ header: h, weight: [4, 1.2, 1.2, 1.8, 1.4, 1.8][i] ?? 1 })),
+        patch.rows
+      );
+
+      if (wOutput.style.display !== 'none') {
+        sheet.need(240);
+        sheet.heading('Power estimate');
+        sheet.paragraph('Estimate; have an electrician verify before you wire or load circuits.', { bold: true });
+        sheet.pairs([...wTotals.rows].map((tr) => [tr.cells[0].textContent ?? '', tr.cells[1].textContent ?? ''] as [string, string]), { labelWidth: 280 });
+        if (wPhaseBox.style.display !== 'none') {
+          const ph = readTable(wPhaseBody);
+          sheet.table(ph.heads.map((h) => ({ header: h, weight: 1 })), ph.rows);
+          if (wBalance.textContent) sheet.paragraph(wBalance.textContent, { size: 9 });
+          if (wThreeNote.textContent) sheet.paragraph(wThreeNote.textContent, { size: 9, grey: true });
+        }
+        const circ = readTable(wBody);
+        sheet.table(
+          circ.heads.map((h, i) => ({ header: h, weight: circ.heads.length === 6 ? [1, 1.4, 2.2, 1.1, 1.3, 4][i] : [1, 2.2, 1.1, 1.3, 4][i] ?? 1 })),
+          circ.rows
+        );
+        if (wWarning.style.display !== 'none' && wWarning.textContent) sheet.paragraph(`Check: ${wWarning.textContent}`, { size: 9, grey: true });
+        sheet.paragraph('The circuit count assumes 120 V single-pole circuits filled largest fixture first. Inrush current when many fixtures switch on together is not modelled, so treat the count as a minimum.', { size: 9, grey: true });
+      }
+
+      const bytes = await sheet.finish();
+      const base = safeFilename(project, '');
+      downloadFile(bytes, base ? `${base}-patch.pdf` : 'dmx-patch.pdf', 'application/pdf');
+    } catch {
+      pWarning.textContent = 'The PDF could not be made. Try again, or use the CSV download.';
+      pWarning.style.display = 'block';
+    } finally {
+      pdfBtn.disabled = false;
+      pdfBtn.textContent = label;
+    }
   });
 
   (document.getElementById('p-add') as HTMLButtonElement).addEventListener('click', () => {

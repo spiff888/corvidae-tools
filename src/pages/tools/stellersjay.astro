@@ -44,6 +44,12 @@ import Footer from '../../components/Footer.astro';
     </table>
   </div>
 
+  <div class="export-row">
+    <button type="button" id="poe-csv-btn" class="export-btn">Download CSV</button>
+    <button type="button" id="poe-pdf-btn" class="export-btn">Download PDF</button>
+  </div>
+  <p id="poe-export-note" class="export-note" role="status"></p>
+
   </div>
 
   <div id="ups-section" style="display: none;">
@@ -95,6 +101,12 @@ import Footer from '../../components/Footer.astro';
     </div>
   </div>
 
+  <div class="export-row">
+    <button type="button" id="ups-csv-btn" class="export-btn">Download CSV</button>
+    <button type="button" id="ups-pdf-btn" class="export-btn">Download PDF</button>
+  </div>
+  <p id="ups-export-note" class="export-note" role="status"></p>
+
   </div>
 
   <Footer />
@@ -115,6 +127,33 @@ import Footer from '../../components/Footer.astro';
     background: var(--bg-card);
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .export-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 20px 0 8px;
+  }
+  .export-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .export-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .export-note {
+    margin: 0 0 24px;
+    min-height: 18px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: #e0b374;
   }
   .ups-input {
     background: var(--bg-card);
@@ -143,6 +182,8 @@ import Footer from '../../components/Footer.astro';
 </style>
 
 <script>
+  import { csvLine, downloadFile, todayStamp } from '../../lib/exportHelpers';
+
   interface Device {
     id: number;
     label: string;
@@ -325,34 +366,24 @@ import Footer from '../../components/Footer.astro';
     return Math.log(runtime1 / runtime2) / Math.log(load2 / load1);
   }
 
-  function renderUps() {
+  // the numbers behind the UPS results, shared by the screen and the exports
+  function upsValues() {
     const load1 = Number(refLoad1.value);
     const runtime1 = Number(refRuntime1.value);
     const load2 = Number(refLoad2.value);
     const runtime2 = Number(refRuntime2.value);
     const n = fitExponent(load1, runtime1, load2, runtime2);
-
-    if (n === null) {
-      runtimeResult.textContent = '\u2014';
-      maxLoadResult.textContent = '\u2014';
-      return;
-    }
-
     const targetLoad = Number(targetLoadInput.value);
-    if (targetLoad > 0) {
-      const est = runtime1 * Math.pow(load1 / targetLoad, n);
-      runtimeResult.textContent = `${est.toFixed(1)} min`;
-    } else {
-      runtimeResult.textContent = '\u2014';
-    }
-
     const targetRuntime = Number(targetRuntimeInput.value);
-    if (targetRuntime > 0 && n !== 0) {
-      const maxLoad = load1 * Math.pow(runtime1 / targetRuntime, 1 / n);
-      maxLoadResult.textContent = `${maxLoad.toFixed(0)} W`;
-    } else {
-      maxLoadResult.textContent = '\u2014';
-    }
+    const est = n !== null && targetLoad > 0 ? runtime1 * Math.pow(load1 / targetLoad, n) : null;
+    const maxLoad = n !== null && targetRuntime > 0 && n !== 0 ? load1 * Math.pow(runtime1 / targetRuntime, 1 / n) : null;
+    return { load1, runtime1, load2, runtime2, n, targetLoad, targetRuntime, est, maxLoad };
+  }
+
+  function renderUps() {
+    const v = upsValues();
+    runtimeResult.textContent = v.est !== null ? `${v.est.toFixed(1)} min` : '\u2014';
+    maxLoadResult.textContent = v.maxLoad !== null ? `${v.maxLoad.toFixed(0)} W` : '\u2014';
   }
 
   [refLoad1, refRuntime1, refLoad2, refRuntime2, targetLoadInput, targetRuntimeInput].forEach((el) => {
@@ -370,6 +401,134 @@ import Footer from '../../components/Footer.astro';
       vaResult.textContent = '\u2014';
     }
   }
+
+  // --- Exports (CSV and PDF) ---
+  const FOOTER = "Estimate; verify against vendor specs. Made with Steller's Jay, corvidae.tools/tools/stellersjay.";
+  const poeNote = document.getElementById('poe-export-note') as HTMLParagraphElement;
+  const upsNote = document.getElementById('ups-export-note') as HTMLParagraphElement;
+
+  const classText = (d: Device) => (d.classValue === 'custom' ? 'Custom' : `Class ${d.classValue}`);
+  const deviceName = (d: Device, i: number) => d.label.trim() || `Device ${i + 1}`;
+  const w1 = (n: number) => `${n.toFixed(1)} W`;
+
+  function poeData() {
+    const budget = Number(budgetInput.value) || 0;
+    const rows = devices.map((d, i) => ({ name: deviceName(d, i), cls: classText(d), watts: wattsFor(d) }));
+    const total = rows.reduce((s, r) => s + r.watts, 0);
+    return { budget, rows, total, remaining: budget - total };
+  }
+
+  function upsExportable() {
+    const v = upsValues();
+    if (v.n === null) {
+      upsNote.textContent = 'Enter two different datasheet points first (loads and runtimes above zero).';
+      return null;
+    }
+    upsNote.textContent = '';
+    const va = Number(vaInput.value);
+    const pf = Number(pfInput.value);
+    return { v, va: va > 0 && pf > 0 ? { va, pf, w: va * pf } : null };
+  }
+
+  document.getElementById('poe-csv-btn')?.addEventListener('click', () => {
+    poeNote.textContent = '';
+    const d = poeData();
+    const lines = [csvLine(['Device', 'PoE class', 'Watts'])];
+    for (const r of d.rows) lines.push(csvLine([r.name, r.cls, Number(r.watts.toFixed(1))]));
+    lines.push('');
+    lines.push(csvLine(['Switch budget (W)', '', Number(d.budget.toFixed(1))]));
+    lines.push(csvLine(['Devices', '', d.rows.length]));
+    lines.push(csvLine(['Total reserved (W)', '', Number(d.total.toFixed(1))]));
+    lines.push(csvLine([d.remaining < 0 ? 'Over budget by (W)' : 'Headroom remaining (W)', '', Number(Math.abs(d.remaining).toFixed(1))]));
+    downloadFile(lines.join('\n') + '\n', `poe-budget-${todayStamp()}.csv`, 'text/csv');
+  });
+
+  document.getElementById('ups-csv-btn')?.addEventListener('click', () => {
+    const u = upsExportable();
+    if (!u) return;
+    const { v } = u;
+    const lines = [csvLine(['Item', 'Value', 'Unit'])];
+    lines.push(csvLine(['Datasheet point 1 load', v.load1, 'W']), csvLine(['Datasheet point 1 runtime', v.runtime1, 'min']));
+    lines.push(csvLine(['Datasheet point 2 load', v.load2, 'W']), csvLine(['Datasheet point 2 runtime', v.runtime2, 'min']));
+    lines.push(csvLine(['Fitted curve exponent', Number((v.n as number).toFixed(3)), '']));
+    if (u.va) lines.push(csvLine(['Load from VA', Number(u.va.va.toFixed(1)), 'VA']), csvLine(['Power factor', u.va.pf, '']), csvLine(['Load in watts', Number(u.va.w.toFixed(1)), 'W']));
+    if (v.targetLoad > 0) lines.push(csvLine(['Your load', v.targetLoad, 'W']));
+    if (v.est !== null) lines.push(csvLine(['Estimated runtime', Number(v.est.toFixed(1)), 'min']));
+    if (v.targetRuntime > 0) lines.push(csvLine(['Runtime you need', v.targetRuntime, 'min']));
+    if (v.maxLoad !== null) lines.push(csvLine(['Max load to hit it', Math.round(v.maxLoad), 'W']));
+    lines.push(csvLine(['Note', 'Estimate; verify against vendor specs.', '']));
+    downloadFile(lines.join('\n') + '\n', `ups-runtime-${todayStamp()}.csv`, 'text/csv');
+  });
+
+  async function withButton(btn: HTMLButtonElement, note: HTMLParagraphElement, job: () => Promise<void>) {
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Making PDF...';
+    note.textContent = '';
+    try {
+      await job();
+    } catch {
+      note.textContent = 'The PDF could not be made. Try again, or use the CSV download.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+
+  const poePdf = document.getElementById('poe-pdf-btn') as HTMLButtonElement;
+  poePdf.addEventListener('click', () =>
+    withButton(poePdf, poeNote, async () => {
+      const { createSheet } = await import('../../lib/pdfSheet');
+      const d = poeData();
+      const sheet = await createSheet({ title: 'PoE budget summary', footer: FOOTER });
+      sheet.title('PoE budget summary');
+      sheet.pairs([['Date', todayStamp()]]);
+      sheet.heading('Inputs');
+      sheet.pairs([['Switch PoE budget', w1(d.budget)], ['Devices', String(d.rows.length)]]);
+      sheet.table(
+        [{ header: 'Device', weight: 5 }, { header: 'PoE class', weight: 2 }, { header: 'Watts reserved', weight: 2, align: 'right' }],
+        d.rows.map((r) => [r.name, r.cls, r.watts.toFixed(1)])
+      );
+      sheet.heading('Result');
+      sheet.pairs([
+        ['Total reserved', w1(d.total)],
+        [d.remaining < 0 ? 'Over budget by' : 'Headroom remaining', w1(Math.abs(d.remaining))],
+        ['Budget used', d.budget > 0 ? `${((d.total / d.budget) * 100).toFixed(0)}%` : 'n/a']
+      ]);
+      if (d.remaining < 0) sheet.paragraph('This list reserves more power than the switch can supply. Some devices would not power up.', { bold: true });
+      sheet.paragraph('Switches usually reserve power by each device’s negotiated class (its worst case), not its everyday draw. Budget for the class.', { size: 9, grey: true });
+      downloadFile(await sheet.finish(), `poe-budget-${todayStamp()}.pdf`, 'application/pdf');
+    })
+  );
+
+  const upsPdf = document.getElementById('ups-pdf-btn') as HTMLButtonElement;
+  upsPdf.addEventListener('click', () =>
+    withButton(upsPdf, upsNote, async () => {
+      const u = upsExportable();
+      if (!u) return;
+      const { v } = u;
+      const { createSheet } = await import('../../lib/pdfSheet');
+      const sheet = await createSheet({ title: 'UPS runtime estimate', footer: FOOTER });
+      sheet.title('UPS runtime estimate');
+      sheet.pairs([['Date', todayStamp()]]);
+      sheet.heading('Inputs');
+      sheet.pairs([
+        ['Datasheet point 1', `${v.load1} W for ${v.runtime1} min`],
+        ['Datasheet point 2', `${v.load2} W for ${v.runtime2} min`],
+        ...(u.va ? ([['Load from VA', `${u.va.va} VA x PF ${u.va.pf} = ${u.va.w.toFixed(0)} W`]] as [string, string][]) : []),
+        ...(v.targetLoad > 0 ? ([['Your load', `${v.targetLoad} W`]] as [string, string][]) : []),
+        ...(v.targetRuntime > 0 ? ([['Runtime you need', `${v.targetRuntime} min`]] as [string, string][]) : [])
+      ]);
+      sheet.heading('Result');
+      sheet.pairs([
+        ['Estimated runtime at your load', v.est !== null ? `${v.est.toFixed(1)} min` : 'n/a'],
+        ['Max load for the runtime you need', v.maxLoad !== null ? `${v.maxLoad.toFixed(0)} W` : 'n/a'],
+        ['Fitted curve exponent', (v.n as number).toFixed(3)]
+      ], { labelWidth: 230 });
+      sheet.paragraph('Runtime does not scale in a straight line with load, so this fits a curve through the two datasheet points. Batteries lose capacity as they age and in the cold, so leave margin.', { size: 9, grey: true });
+      downloadFile(await sheet.finish(), `ups-runtime-${todayStamp()}.pdf`, 'application/pdf');
+    })
+  );
 
   renderUps();
 </script>
